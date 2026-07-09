@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, Bus, LayoutDashboard, UserPlus, Ticket, CreditCard, ShieldCheck, LogOut } from 'lucide-react';
+import { Loader2, Bus, LayoutDashboard, UserPlus, Ticket, CreditCard, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
 
 // Import our clean architecture nodes
 import Auth from './Auth';
@@ -17,6 +17,9 @@ export default function App() {
   
   // Sidebar view manager: matches your 4 diagram items
   const [sidebarView, setSidebarView] = useState('home'); 
+
+  // Mobile navigation drawer toggle state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     // Initial handshake check
@@ -97,37 +100,67 @@ export default function App() {
 
   // 4. Regular Users & Liccommers Layout (Main Dashboard Tree)
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen bg-black text-white flex flex-col md:flex-row relative overflow-x-hidden">
       
-      {/* SIDEBAR NAVIGATION GRID */}
-      <aside className="w-64 bg-zinc-950 border-r border-zinc-900 flex flex-col justify-between p-4 shrink-0 font-mono">
+      {/* MOBILE TOPBAR CONTROLLER (Only mounts on small screens) */}
+      <div className="md:hidden w-full bg-zinc-950 border-b border-zinc-900 p-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <Bus className="text-cyan-400" size={18} />
+          <span className="font-black tracking-widest text-xs text-zinc-200">LAKESHORE</span>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-xl active:scale-95"
+        >
+          {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+        </button>
+      </div>
+
+      {/* SIDEBAR NAVIGATION GRID (Responsive Drawer Overlay on Smartphones) */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-zinc-950 border-r border-zinc-900 flex flex-col justify-between p-4 font-mono
+        transform transition-transform duration-300 ease-in-out md:relative md:transform-none md:shrink-0
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         <div className="space-y-8">
-          <div className="flex items-center gap-2.5 px-2 py-1">
+          <div className="hidden md:flex items-center gap-2.5 px-2 py-1">
             <Bus className="text-cyan-400" size={20} />
             <span className="font-black tracking-widest text-sm text-zinc-200">LAKESHORE</span>
           </div>
           
           <nav className="space-y-1">
             <button 
-              onClick={() => setSidebarView('home')} 
+              onClick={() => {
+                setSidebarView('home');
+                setIsMobileMenuOpen(false); // Auto close mobile menu
+              }} 
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${sidebarView === 'home' ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(0,240,255,0.2)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
             >
               <LayoutDashboard size={16} /> 1. Home
             </button>
             <button 
-              onClick={() => setSidebarView('register')} 
+              onClick={() => {
+                setSidebarView('register');
+                setIsMobileMenuOpen(false); // Auto close mobile menu
+              }} 
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${sidebarView === 'register' ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(0,240,255,0.2)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
             >
               <UserPlus size={16} /> 2. Register
             </button>
             <button 
-              onClick={() => setSidebarView('booking')} 
+              onClick={() => {
+                setSidebarView('booking');
+                setIsMobileMenuOpen(false); // Auto close mobile menu
+              }} 
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${sidebarView === 'booking' ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(0,240,255,0.2)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
             >
               <Ticket size={16} /> 3. Booking
             </button>
             <button 
-              onClick={() => setSidebarView('payment')} 
+              onClick={() => {
+                setSidebarView('payment');
+                setIsMobileMenuOpen(false); // Auto close mobile menu
+              }} 
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${sidebarView === 'payment' ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(0,240,255,0.2)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
             >
               <CreditCard size={16} /> 4. Payment
@@ -135,13 +168,21 @@ export default function App() {
           </nav>
         </div>
 
-        <button onClick={handleLogout} className="flex items-center gap-2 text-zinc-600 hover:text-red-400 text-xs font-bold p-2 transition-colors">
+        <button onClick={handleLogout} className="flex items-center gap-2 text-zinc-600 hover:text-red-400 text-xs font-bold p-2 transition-colors mt-auto">
           <LogOut size={14} /> Exit Station
         </button>
       </aside>
 
+      {/* MOBILE DARK BACKDROP OVERLAY TRAP */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
+        />
+      )}
+
       {/* DASHBOARD ROUTED CONTENT VIEWSPACE */}
-      <main className="flex-grow p-8 bg-zinc-950/40 relative overflow-y-auto">
+      <main className="flex-grow p-4 sm:p-6 lg:p-8 bg-zinc-950/40 relative overflow-y-auto w-full max-w-full">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,240,255,0.015),transparent_50%)] pointer-events-none"></div>
         
         {sidebarView === 'home' && <Home />}
