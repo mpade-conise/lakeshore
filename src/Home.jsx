@@ -18,9 +18,9 @@ export default function Home() {
       try {
         setLoading(true);
 
-        // 1. Fetch live passenger booking records from Supabase
+        // 1. Fetch live passenger booking records from the "lakeshore" table
         const { data: passengers, error: fetchError } = await supabase
-          .from('passengers') // Ensure this matches your exact table name
+          .from('lakeshore') 
           .select('*')
           .order('created_at', { ascending: false });
 
@@ -28,36 +28,36 @@ export default function Home() {
 
         const recordArray = passengers || [];
 
-        // 2. Compute dynamic metrics based on real-time table state
+        // 2. Compute dynamic metrics based on real-time table schema
         const total = recordArray.length;
         
-        // Extract unique locations to dynamically calculate active centers
-        const uniqueCenters = [...new Set(recordArray.map(p => p.fromLocation || p.center).filter(Boolean))];
-        const activeCentersCount = uniqueCenters.length || 4; // Fallback to nominal baseline if empty
+        // Extract unique locations via "departing_center" column
+        const uniqueCenters = [...new Set(recordArray.map(p => p.departing_center).filter(Boolean))];
+        const activeCentersCount = uniqueCenters.length || 4; // Fallback baseline configuration if empty
 
-        // Calculate seats filled today (filtering records matching current UTC/local day boundary)
+        // Calculate seats filled today matching current UTC/local day boundary
         const todayStr = new Date().toISOString().split('T')[0];
         const filledToday = recordArray.filter(p => p.created_at && p.created_at.startsWith(todayStr)).length;
 
         setAnalytics({
           totalBookings: total,
           activeRoutes: activeCentersCount,
-          seatsFilledToday: filledToday || total, // Fallback to total if no records match today's date context
+          seatsFilledToday: filledToday || total, // Fallback configuration to total if none recorded today
         });
 
-        // 3. Populate dynamic passenger roster array
+        // 3. Populate passenger roster array using valid table column attributes
         const formattedPassengers = recordArray.map((p, idx) => ({
           id: p.id || `gen-${idx}`,
-          name: p.fullName || p.name || 'Anonymous Student',
-          seat: p.allocatedSeat || p.seat || 'Pending',
-          center: p.fromLocation || p.center || 'Mwasambo Hub',
+          name: p.full_name || 'Anonymous Student',
+          seat: p.selected_seat || 'Pending',
+          center: p.departing_center || 'Mwasambo Hub',
         }));
         setBookedPassengers(formattedPassengers);
 
-        // 4. Calculate dynamic route demand distribution percentages
+        // 4. Calculate dynamic route demand distribution percentages using "departing_center"
         const routeCounts = {};
         recordArray.forEach(p => {
-          const loc = p.fromLocation || p.center || 'Other Routes';
+          const loc = p.departing_center || 'Other Routes';
           routeCounts[loc] = (routeCounts[loc] || 0) + 1;
         });
 
@@ -66,7 +66,7 @@ export default function Home() {
           percentage: total > 0 ? Math.round((routeCounts[route] / total) * 100) : 0
         })).sort((a, b) => b.percentage - a.percentage);
 
-        // Fallback baseline configuration if the table database is fresh/empty
+        // Fallback baseline configuration if the table database is completely fresh
         setRouteStats(derivedStats.length > 0 ? derivedStats : [
           { name: 'MUBAS Main Campus', percentage: 75 },
           { name: 'Lakeshore Express', percentage: 25 }
@@ -102,7 +102,7 @@ export default function Home() {
         </p>
       </div>
 
-      {/* METRIC CARD MATRIX - Completely responsive collapse hierarchy */}
+      {/* METRIC CARD MATRIX */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         
         {/* TOTAL BOOKINGS */}
@@ -159,7 +159,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* BOOKED PASSENGERS MOBILE ROSTER RESPONSIVE VIEW */}
+        {/* BOOKED PASSENGERS MATRIX SHOWCASE */}
         <div className="lg:col-span-2 bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 space-y-4">
           <h3 className="text-[11px] sm:text-xs font-black tracking-wider text-zinc-400 uppercase flex items-center gap-2">
             <Users size={14} className="text-cyan-400 flex-shrink-0" /> Booked Passengers & Assigned Seats
@@ -193,7 +193,7 @@ export default function Home() {
                 </table>
               </div>
 
-              {/* ULTRA-MOBILE OPTIMIZED CARD CAROUSEL VIEW (Triggers on phone displays) */}
+              {/* ULTRA-MOBILE OPTIMIZED CARD VIEW (Triggers on phone displays) */}
               <div className="block sm:hidden space-y-2 max-h-72 overflow-y-auto pr-1">
                 {bookedPassengers.map((passenger) => (
                   <div key={passenger.id} className="bg-zinc-900/30 border border-zinc-900/80 p-3 rounded-xl flex items-center justify-between gap-3">
