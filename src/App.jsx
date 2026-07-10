@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, Bus, LayoutDashboard, UserPlus, Ticket, CreditCard, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
+import { Loader2, Bus, LayoutDashboard, UserPlus, Ticket, CreditCard, LogOut, Menu, X } from 'lucide-react';
 
 // Import our clean architecture nodes
 import Auth from './Auth';
@@ -9,6 +9,7 @@ import Home from './Home';
 import RegisterComponent from './Register'; // Aliased to prevent collision
 import SearchTrips from './SearchTrips';   // Maps to Booking tree
 import Payment from './Payment';
+import AdminDashboard from './AdminDashboard'; // Administrative Command Node
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -82,23 +83,32 @@ export default function App() {
     );
   }
 
-  // 3. Admin Branch Escape Route (Admin Portal Only)
+  // 3. Admin Branch Escape Route (Admin Portal Fully Operational)
   if (role === 'admin') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6">
-        <div className="border border-red-500/30 bg-red-950/10 rounded-2xl p-8 max-w-md text-center space-y-4">
-          <ShieldCheck className="text-red-400 mx-auto" size={48} />
-          <h2 className="text-xl font-black tracking-wider">ADMINISTRATOR SECURE PORTAL</h2>
-          <p className="text-xs text-zinc-400 font-mono">System routing isolated from passenger workflows.</p>
-          <button onClick={handleLogout} className="bg-red-500 text-black font-bold text-xs px-4 py-2 rounded-xl flex items-center justify-center gap-2 mx-auto">
-            <LogOut size={14} /> Terminate Session
+      <div className="min-h-screen bg-black text-white flex flex-col md:flex-row relative overflow-x-hidden">
+        {/* ADMIN SIDEBAR DRAWER */}
+        <aside className="w-full md:w-64 bg-zinc-950 border-b md:border-b-0 md:border-r border-zinc-900 flex flex-row md:flex-col justify-between p-4 font-mono shrink-0 items-center md:items-stretch">
+          <div className="flex md:flex-col gap-6 items-center md:items-start w-full">
+            <div className="flex items-center gap-2.5 px-2 py-1">
+              <Bus className="text-red-400" size={20} />
+              <span className="font-black tracking-widest text-sm text-zinc-200">LAKESHORE CONTROL</span>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="flex items-center gap-2 text-zinc-500 hover:text-red-400 text-xs font-bold p-2 transition-colors">
+            <LogOut size={14} /> Kill Command
           </button>
-        </div>
+        </aside>
+
+        {/* MAIN VIEWSPACE PORTAL */}
+        <main className="flex-grow p-4 sm:p-6 lg:p-8 bg-zinc-950/40 relative overflow-y-auto w-full max-w-full">
+          <AdminDashboard />
+        </main>
       </div>
     );
   }
 
-  // 4. Regular Users & Liccommers Layout (Main Dashboard Tree)
+  // 4. Regular Users & Liccommers Layout (Main Passenger Dashboard Tree)
   return (
     <div className="min-h-screen bg-black text-white flex flex-col md:flex-row relative overflow-x-hidden">
       
@@ -191,7 +201,6 @@ export default function App() {
           <RegisterComponent onRegistrationSuccess={() => setSidebarView('booking')} />
         )}
         
-        {/* INTERCEPTED AND CONNECTED TO PROP PIPELINE */}
         {sidebarView === 'booking' && (
           <SearchTrips onBookingSuccess={() => setSidebarView('payment')} />
         )}
