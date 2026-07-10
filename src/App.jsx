@@ -9,7 +9,7 @@ import Home from './Home';
 import RegisterComponent from './Register'; // Aliased to prevent collision
 import SearchTrips from './SearchTrips';   // Maps to Booking tree
 import Payment from './Payment';
-import AdminDashboard from './AdminDashboard'; // Administrative Command Node
+import AdminDashboard from './Admin/AdminDashboard'; // Administrative Command Node
 
 export default function App() {
   const [user, setUser] = useState(null);
