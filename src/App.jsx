@@ -187,12 +187,15 @@ export default function App() {
         
         {sidebarView === 'home' && <Home />}
         
-        {/* INTERCEPTED AND CONNECTED TO PROP PIPELINE */}
         {sidebarView === 'register' && (
           <RegisterComponent onRegistrationSuccess={() => setSidebarView('booking')} />
         )}
         
-        {sidebarView === 'booking' && <SearchTrips />}
+        {/* INTERCEPTED AND CONNECTED TO PROP PIPELINE */}
+        {sidebarView === 'booking' && (
+          <SearchTrips onBookingSuccess={() => setSidebarView('payment')} />
+        )}
+        
         {sidebarView === 'payment' && <Payment />}
       </main>
 
