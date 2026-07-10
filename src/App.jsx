@@ -186,7 +186,12 @@ export default function App() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,240,255,0.015),transparent_50%)] pointer-events-none"></div>
         
         {sidebarView === 'home' && <Home />}
-        {sidebarView === 'register' && <RegisterComponent />}
+        
+        {/* INTERCEPTED AND CONNECTED TO PROP PIPELINE */}
+        {sidebarView === 'register' && (
+          <RegisterComponent onRegistrationSuccess={() => setSidebarView('booking')} />
+        )}
+        
         {sidebarView === 'booking' && <SearchTrips />}
         {sidebarView === 'payment' && <Payment />}
       </main>
