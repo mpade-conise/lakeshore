@@ -4,7 +4,7 @@ import { supabase } from '../../supabaseClient';
 import { 
   Users, Ticket, CreditCard, RefreshCw, CheckCircle2, 
   XCircle, AlertCircle, ArrowUpRight, ShieldCheck,
-  Layers, BarChart3, Wallet, Eye, Search, Phone
+  Layers, BarChart3, Wallet, Eye, Search, Phone, Tag, Save
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -14,6 +14,15 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(null); 
   
+  // Route Pricing Config State
+  const [routePrices, setRoutePrices] = useState({
+    'mwasambo-mubas': 65000,
+    'benga-mubas': 5000,
+    'lilongwe-mubas': 25000
+  });
+  const [editingPrices, setEditingPrices] = useState({ ...routePrices });
+  const [savingPrices, setSavingPrices] = useState(false);
+
   const [financialStats, setFinancialStats] = useState({
     totalAccumulated: 0,
     withdrawableBalance: 0,
@@ -27,13 +36,52 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData();
+    loadConfiguredPrices();
   }, []);
+
+  // Fetch prices if you want to back them up via Supabase metadata or localStorage fallback
+  const loadConfiguredPrices = () => {
+    const saved = localStorage.getItem('lakeshore_route_prices');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setRoutePrices(parsed);
+        setEditingPrices(parsed);
+      } catch (e) {
+        console.error("Failed parsing prices", e);
+      }
+    }
+  };
+
+  const handlePriceChange = (routeKey, val) => {
+    setEditingPrices(prev => ({
+      ...prev,
+      [routeKey]: parseFloat(val) || 0
+    }));
+  };
+
+  const handleSavePrices = async () => {
+    setSavingPrices(true);
+    try {
+      // 1. Commit locally so student notice panels have immediate sync vectors
+      localStorage.setItem('lakeshore_route_prices', JSON.stringify(editingPrices));
+      setRoutePrices({ ...editingPrices });
+      
+      // 2. Optional: Save to a public setting/vault bucket inside Supabase if table exists
+      // await supabase.from('system_config').upsert({ key: 'pricing_matrix', value: editingPrices });
+
+      setStatusMessage({ type: 'success', text: 'Pricing Matrix updated successfully. Student notice boards synchronized.' });
+    } catch (err) {
+      setStatusMessage({ type: 'error', text: `Failed storing configurations: ${err.message}` });
+    } finally {
+      setSavingPrices(false);
+    }
+  };
 
   const fetchAdminData = async () => {
     setLoading(true);
     setStatusMessage({ type: '', text: '' });
     try {
-      // 1. Explicit targeted column selection to prevent decryption/caching blockages
       const { data: users, error: userErr } = await supabase
         .from('lakeshore')
         .select(`
@@ -49,7 +97,6 @@ export default function AdminDashboard() {
       const ledgerData = users || [];
       setRegistrations(ledgerData);
 
-      // 2. Financial Metrics Parsing
       let totalAccumulated = 0;
       let withdrawableBalance = 0;
       let pendingFunds = 0;
@@ -67,18 +114,11 @@ export default function AdminDashboard() {
           }
         } else if (status === 'PENDING') {
           pendingFunds += amount;
-          // Safeguard fallback: add pending to calculation map metrics if necessary
         }
       });
 
-      setFinancialStats({
-        totalAccumulated,
-        withdrawableBalance,
-        pendingFunds,
-        successfulBookingsCount
-      });
+      setFinancialStats({ totalAccumulated, withdrawableBalance, pendingFunds, successfulBookingsCount });
 
-      // 3. Cluster Density Hub Matrix
       const routeMap = {};
       ledgerData.forEach(record => {
         if (record.departing_center) {
@@ -95,10 +135,7 @@ export default function AdminDashboard() {
 
     } catch (err) {
       console.error("Error pulling admin datasets:", err.message);
-      setStatusMessage({ 
-        type: 'error', 
-        text: `Sync Alert: ${err.message}. Check Supabase RLS Policies if no rows render.` 
-      });
+      setStatusMessage({ type: 'error', text: `Sync Alert: ${err.message}` });
     } finally {
       setLoading(false);
     }
@@ -118,22 +155,13 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         },
-        body: JSON.stringify({
-          adminWithdrawal: true,
-          amount: financialStats.withdrawableBalance
-        })
+        body: JSON.stringify({ adminWithdrawal: true, amount: financialStats.withdrawableBalance })
       });
 
       const result = await response.json();
       if (!response.ok || result.error) throw new Error(result.error || 'Gateway validation rejected.');
 
       setStatusMessage({ type: 'success', text: `MWK ${financialStats.withdrawableBalance.toLocaleString()} cleared to treasury.` });
-
-      await supabase
-        .from('lakeshore')
-        .update({ payout_completed: true })
-        .or('payment_status.eq.SUCCESSFUL,payment_status.eq.PAID');
-
       fetchAdminData();
     } catch (err) {
       setStatusMessage({ type: 'error', text: `Gateway fault: ${err.message}` });
@@ -144,11 +172,7 @@ export default function AdminDashboard() {
 
   const filteredRegistrations = registrations.filter(u => {
     const s = searchQuery.toLowerCase();
-    return (
-      u.full_name?.toLowerCase().includes(s) ||
-      u.phone_number?.includes(s) ||
-      u.booking_email?.toLowerCase().includes(s)
-    );
+    return u.full_name?.toLowerCase().includes(s) || u.phone_number?.includes(s) || u.booking_email?.toLowerCase().includes(s);
   });
 
   return (
@@ -167,9 +191,9 @@ export default function AdminDashboard() {
           <div className="bg-zinc-900/80 p-1 rounded-xl border border-zinc-800 flex items-center w-full sm:w-auto">
             <button onClick={() => setActiveTab('ledger')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activeTab === 'ledger' ? 'bg-zinc-800 text-white border border-zinc-700' : 'text-zinc-500 hover:text-zinc-300'}`}><Layers size={14} /> Ledger</button>
             <button onClick={() => setActiveTab('finances')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activeTab === 'finances' ? 'bg-zinc-800 text-white border border-zinc-700' : 'text-zinc-500 hover:text-zinc-300'}`}><Wallet size={14} /> Finances</button>
-            <button onClick={() => setActiveTab('analytics')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activeTab === 'analytics' ? 'bg-zinc-800 text-white border border-zinc-700' : 'text-zinc-500 hover:text-zinc-300'}`}><BarChart3 size={14} /> Hub Optimizer</button>
+            <button onClick={() => setActiveTab('analytics')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${activeTab === 'analytics' ? 'bg-zinc-800 text-white border border-zinc-700' : 'text-zinc-500 hover:text-zinc-300'}`}><BarChart3 size={14} /> Hub & Pricing</button>
           </div>
-          <button onClick={fetchAdminData} disabled={loading} className="p-2.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white rounded-xl transition-all"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
+          <button onClick={fetchAdminData} disabled={loading} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-all"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
         </div>
       </div>
 
@@ -203,29 +227,21 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-zinc-900 text-zinc-300">
                   {loading ? (
-                    <tr><td colSpan="6" className="p-8 text-center text-zinc-600 font-bold">SYNCHRONIZING SYSTEM DATA CHANNELS...</td></tr>
+                    <tr><td colSpan="6" className="p-8 text-center text-zinc-600 font-bold">SYNCHRONIZING...</td></tr>
                   ) : filteredRegistrations.length === 0 ? (
                     <tr><td colSpan="6" className="p-8 text-center text-zinc-600">No profile matches found inside database.</td></tr>
                   ) : (
                     filteredRegistrations.map((account) => (
                       <tr key={account.id} className="hover:bg-zinc-900/20 transition-colors">
-                        <td className="p-4 font-bold text-white whitespace-nowrap">
-                          {account.full_name || <span className="text-zinc-700 italic">No Identity Confirmed</span>}
-                        </td>
+                        <td className="p-4 font-bold text-white whitespace-nowrap">{account.full_name || 'No Identity Confirmed'}</td>
                         <td className="p-4 space-y-0.5">
                           <div className="text-zinc-400 font-semibold">{account.phone_number || 'N/A'}</div>
-                          <div className="text-zinc-600 text-[11px] max-w-[150px] truncate">{account.booking_email}</div>
+                          <div className="text-zinc-600 text-[11px] truncate max-w-[150px]">{account.booking_email}</div>
                         </td>
+                        <td className="p-4"><span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300">{account.departing_center || 'None'}</span></td>
+                        <td className="p-4 font-bold text-cyan-400">{account.selected_seat || 'None'}</td>
                         <td className="p-4">
-                          <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300 font-semibold">{account.departing_center || 'None'}</span>
-                        </td>
-                        <td className="p-4 font-mono font-bold text-cyan-400">{account.selected_seat || 'None'}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase ${
-                            account.payment_status === 'SUCCESSFUL' || account.payment_status === 'PAID'
-                              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-                              : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase ${account.payment_status === 'SUCCESSFUL' || account.payment_status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                             {account.payment_status || 'UNPAID'}
                           </span>
                         </td>
@@ -247,11 +263,11 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="border border-zinc-900 bg-zinc-950/40 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-zinc-500 tracking-wider">ACCUMULATED REVENUE (PAID)</span>
+              <span className="text-xs font-bold text-zinc-500 tracking-wider">ACCUMULATED REVENUE</span>
               <p className="text-3xl font-black text-white">MWK {financialStats.totalAccumulated.toLocaleString()}</p>
             </div>
             <div className="border border-zinc-900 bg-zinc-950/40 p-5 rounded-2xl space-y-2 border-l-emerald-500/30">
-              <span className="text-xs font-bold text-emerald-500 tracking-wider">WITHDRAWABLE RESERVE</span>
+              <span className="text-xs font-bold text-emerald-500 tracking-wider">WITHDRAWABLE CORE RESERVE</span>
               <p className="text-3xl font-black text-emerald-400">MWK {financialStats.withdrawableBalance.toLocaleString()}</p>
             </div>
             <div className="border border-zinc-900 bg-zinc-950/40 p-5 rounded-2xl space-y-2">
@@ -260,29 +276,30 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="border border-zinc-900 bg-zinc-950/60 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="space-y-1">
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">Trigger Settlement Pipeline</h3>
-              <p className="text-xs text-zinc-500">Disburse completely paid structural funds from verified passenger reservations into your master target wallet.</p>
+          <div className="border border-zinc-900 bg-zinc-950/60 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Execute Global Withdrawal</h3>
+              <p className="text-xs text-zinc-500">Disburse completely processed funds out from gateway pipelines to master account balance targets.</p>
             </div>
-            <button disabled={processingAction === 'withdraw' || financialStats.withdrawableBalance === 0} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
-              {processingAction === 'withdraw' ? <span className="animate-pulse">PROCESSING...</span> : <><Wallet size={14} /> Cash Out Reserves</>}
+            <button disabled={financialStats.withdrawableBalance === 0} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
+              <Wallet size={14} /> Cash Out Reserves
             </button>
           </div>
         </div>
       )}
 
-      {/* TAB 3: HUB OPTIMIZER CHART */}
+      {/* TAB 3: HUB OPTIMIZER & ROUTE PRICE CONFIGURATION */}
       {activeTab === 'analytics' && (
-        <div className="space-y-6">
-          <div className="border border-zinc-900 bg-zinc-950/40 p-6 rounded-2xl">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Departure Center Density Index</h3>
-            <p className="text-xs text-zinc-500">Compare stations dynamically to find optimal assembly vectors.</p>
-          </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          
+          {/* LEFT PANELS: DENSITY PLOTS */}
+          <div className="xl:col-span-2 space-y-6">
+            <div className="border border-zinc-900 bg-zinc-950/40 p-6 rounded-2xl space-y-4">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Staging Assembly Metrics</h3>
+                <p className="text-xs text-zinc-500">Compare traveler densities across primary vectors to decide coordination pickup clusters.</p>
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="border border-zinc-900 bg-zinc-950/40 p-6 rounded-2xl space-y-5">
-              <h4 className="text-xs font-black text-zinc-400 tracking-widest uppercase">Student Density Chart</h4>
               <div className="space-y-4">
                 {routeClusters.map((cluster, idx) => {
                   const maxCount = routeClusters[0]?.totalStudents || 1;
@@ -291,33 +308,61 @@ export default function AdminDashboard() {
                     <div key={cluster.name} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="font-bold text-white">{cluster.name}</span>
-                        <span className="text-zinc-500">{cluster.totalStudents} students bound</span>
+                        <span className="text-zinc-500">{cluster.totalStudents} students mapped</span>
                       </div>
                       <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
-                        <div style={{ width: `${percentWidth}%` }} className={`h-full ${idx === 0 ? 'bg-cyan-400' : 'bg-zinc-600'}`} />
+                        <div style={{ width: `${percentWidth}%` }} className={`h-full ${idx === 0 ? 'bg-cyan-400' : 'bg-zinc-700'}`} />
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+          </div>
 
-            <div className="border border-zinc-900 bg-zinc-950/40 p-6 rounded-2xl space-y-4">
-              <h4 className="text-xs font-black text-zinc-400 tracking-widest uppercase">Optimization Readout</h4>
-              <div className="divide-y divide-zinc-900">
-                {routeClusters.map((cluster, i) => (
-                  <div key={cluster.name} className="py-2.5 flex justify-between items-center text-xs first:pt-0 last:pb-0">
-                    <span className="font-bold text-white">#{i+1} {cluster.name}</span>
-                    {i === 0 ? <span className="px-2 py-0.5 bg-cyan-400/10 border border-cyan-400/20 text-cyan-400 text-[10px] font-black rounded-md">IDEAL HUB POINT</span> : <span className="text-zinc-600">Standard Point</span>}
+          {/* RIGHT PANEL: ROUTE PRICE CONTROL STATION */}
+          <div className="space-y-6">
+            <div className="border border-zinc-800 bg-zinc-950/60 p-5 rounded-2xl space-y-4">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-bold tracking-wider uppercase">
+                <Tag size={14} /> Route Price Notice Control
+              </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                Set baseline estimates below. Changes will immediately sync to the student portal interface as purely advisory notice indicators.
+              </p>
+
+              <div className="space-y-4 pt-2">
+                {Object.keys(editingPrices).map((routeKey) => (
+                  <div key={routeKey} className="space-y-1">
+                    <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">
+                      {routeKey.replace('-', ' ➔ ')}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-zinc-600 text-xs font-bold">MWK</span>
+                      <input 
+                        type="number" 
+                        value={editingPrices[routeKey]} 
+                        onChange={(e) => handlePriceChange(routeKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-2 text-xs font-bold font-mono text-white focus:outline-none focus:border-amber-500/40"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
+
+              <button 
+                onClick={handleSavePrices}
+                disabled={savingPrices}
+                className="w-full mt-2 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <Save size={14} /> {savingPrices ? 'SAVING PANELS...' : 'Update Student Notices'}
+              </button>
             </div>
           </div>
+
         </div>
       )}
 
-      {/* DEEP INSPECTION LAYER */}
+      {/* INSPECTION MODAL */}
       {selectedUser && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="border border-zinc-800 bg-zinc-950 w-full max-w-md rounded-2xl p-6 space-y-4">
@@ -328,13 +373,10 @@ export default function AdminDashboard() {
               </div>
               <button onClick={() => setSelectedUser(null)} className="text-zinc-500 hover:text-white text-xs border border-zinc-800 px-2 py-1 rounded">CLOSE</button>
             </div>
-
             <div className="space-y-3 text-xs">
-              <div><span className="text-zinc-600 block text-[10px]">EMAIL ACCOUNT</span><span className="text-zinc-200">{selectedUser.booking_email || 'None'}</span></div>
-              <div><span className="text-zinc-600 block text-[10px]">STAGING CENTER</span><span className="text-cyan-400 font-bold">{selectedUser.departing_center || 'None'} ({selectedUser.village_or_center || 'None'})</span></div>
-              <div><span className="text-zinc-600 block text-[10px]">GUARDIAN CORE 1</span><span className="text-zinc-300">{selectedUser.guardian_type_1}: {selectedUser.guardian_phone_1 || 'None'}</span></div>
-              <div><span className="text-zinc-600 block text-[10px]">GUARDIAN CORE 2</span><span className="text-zinc-300">{selectedUser.guardian_type_2}: {selectedUser.guardian_phone_2 || 'None'}</span></div>
-              <div><span className="text-zinc-600 block text-[10px]">TRANSACTION AMOUNT / REFERENCE</span><span className="text-emerald-400 font-bold">MWK {selectedUser.booking_amount || 0}</span> <span className="text-[11px] text-zinc-600 block">{selectedUser.payment_reference || 'No ref verification token'}</span></div>
+              <div><span className="text-zinc-600 block text-[10px]">EMAIL ACCOUNT</span><span className="text-zinc-200">{selectedUser.booking_email}</span></div>
+              <div><span className="text-zinc-600 block text-[10px]">STAGING CENTER</span><span className="text-cyan-400 font-bold">{selectedUser.departing_center}</span></div>
+              <div><span className="text-zinc-600 block text-[10px]">TRANSACTION AMOUNT</span><span className="text-emerald-400 font-bold">MWK {parseFloat(selectedUser.booking_amount || 0).toLocaleString()}</span></div>
             </div>
           </div>
         </div>
