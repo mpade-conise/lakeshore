@@ -1,9 +1,9 @@
 // src/SearchTrips.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Mail, Home as HomeIcon, CheckSquare, Square, Armchair, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Mail, Home as HomeIcon, CheckSquare, Square, Armchair, AlertTriangle, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 
-export default function SearchTrips() {
+export default function SearchTrips({ onBookingSuccess }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isBooked, setIsBooked] = useState(false);
@@ -141,15 +141,25 @@ export default function SearchTrips() {
       )}
 
       {isBooked ? (
-        <div className="bg-zinc-950 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-4 animate-in zoom-in-95">
+        <div className="bg-zinc-950 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 max-w-md mx-auto animate-in zoom-in-95">
           <CheckCircle2 className="text-cyan-400 mx-auto" size={44} />
           <div className="space-y-1">
             <h3 className="text-sm font-bold text-white uppercase">Seat Safe-Locked Successfully</h3>
             <p className="text-xs text-zinc-400">Seat node [{selectedSeat}] holds your allocation signature.</p>
           </div>
-          <p className="text-[10px] text-zinc-500 uppercase font-bold animate-pulse pt-2">
-            Proceed to "4. Payment" to execute your PayChangu payload transaction
+          
+          <p className="text-[10px] text-zinc-500 uppercase font-bold pt-1">
+            Ready to execute your PayChangu payload transaction
           </p>
+
+          {onBookingSuccess && (
+            <button
+              onClick={onBookingSuccess}
+              className="w-full bg-cyan-400 hover:bg-cyan-500 text-black font-black text-[11px] uppercase tracking-widest rounded-xl py-3 transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+            >
+              Proceed to Payment <ArrowRight size={14} />
+            </button>
+          )}
         </div>
       ) : (
         <form onSubmit={handleCommitBooking} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
