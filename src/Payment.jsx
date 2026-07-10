@@ -26,7 +26,8 @@ export default function Payment() {
     if (storedPassenger) {
       const parsedPassenger = JSON.parse(storedPassenger);
       setPassenger(parsedPassenger);
-      setMomoNumber(parsedPassenger.phoneNumber || '');
+      // Fallback fallback extraction strategy safely mapping incoming strings
+      setMomoNumber(parsedPassenger.phone_number || parsedPassenger.phoneNumber || '');
     }
     
     if (storedTrip) {
@@ -35,8 +36,8 @@ export default function Payment() {
       // Safe fallback configuration if step 3 cache structural variables are out of sync
       setTrip({
         id: 'SECURE-MANIFEST',
-        seat: 'Registered Node',
-        from: 'Mwasambo Hub',
+        seat: 'L3',
+        from: 'Mwasambo',
         fare: 'MWK 5,000'
       });
     }
@@ -47,7 +48,8 @@ export default function Payment() {
     setProcessing(true);
     setErrorMessage('');
 
-    const txReference = `LAKE-${Date.now()}`;
+    // Ensure strict uniqueness for tx_ref to avoid PayChangu API 400 validation failures
+    const txReference = `LAKE-TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const targetAmount = 5000; // Fixed structural booking fee (MWK 5,000)
 
     try {
@@ -75,8 +77,9 @@ export default function Payment() {
       });
 
       // Fetch active auth session safely without breaking context execution
-      let userId = "STU-DEBUG-NODE";
-      let userEmail = "student@mubas.ac.mw";
+      let userId = passenger?.id || "1e58f1a5-5a8f-4013-87bf-9cede57cf326"; 
+      let userEmail = passenger?.booking_email || passenger?.email || "conise@gmail.com";
+      
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -88,9 +91,9 @@ export default function Payment() {
       }
 
       // ====================================================================
-      // LIVE PAYCHANGU INLINE DEPOSIT POPUP INITIALIZATION (WITH TIMING DELAY)
+      // LIVE PAYCHANGU INLINE DEPOSIT POPUP INITIALIZATION
       // ====================================================================
-      // Deferring execution gives the browser 100ms to clear out dead nodes
+      // Deferring execution gives the browser window 150ms to mount target parent frames properly
       setTimeout(() => {
         try {
           window.PaychanguCheckout({
@@ -100,10 +103,10 @@ export default function Payment() {
             currency: "MWK",
             callback_url: window.location.href, 
             customer_id: userId,
-            customer_name: passenger?.fullName || "Patrick Chitambo",
+            customer_name: passenger?.full_name || passenger?.fullName || "Patrick Chitambo",
             customer_email: userEmail,
             custom_fields: {
-              seat_node: trip?.seat || "L1",
+              seat_node: trip?.seat || "L3",
               departing_center: trip?.from || "Mwasambo"
             },
             onclose: () => {
@@ -117,6 +120,24 @@ export default function Payment() {
             },
             onsuccess: async (response) => {
               try {
+                // ====================================================================
+                // SUPABASE PRODUCTION MUTATION LOOP
+                // ====================================================================
+                // Settle and finalize state tracking structures inside 'lakeshore' table
+                const { error: dbError } = await supabase
+                  .from('lakeshore')
+                  .update({
+                    payment_status: 'PAID',
+                    payment_reference: txReference,
+                    momo_number: momoNumber,
+                    momo_provider: momoProvider === 'airtel' ? 'Airtel Money' : 'TNM Mpamba',
+                    payment_completed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', userId);
+
+                if (dbError) throw dbError;
+
                 // Clear out local trip parameters to settle process flow
                 localStorage.removeItem('lakeshore_selected_trip');
 
@@ -124,14 +145,15 @@ export default function Payment() {
                 const confirmationMsg = {
                   id: txReference,
                   type: 'success',
-                  text: `SUCCESS // Booking Finalized! Ref: ${txReference}. Confirmed receipt of MWK ${targetAmount.toLocaleString()} via ${momoProvider.toUpperCase()}.`,
+                  text: `SUCCESS // Booking Finalized! Record mutated to PAID. Ref: ${txReference}. Confirmed receipt of MWK ${targetAmount.toLocaleString()} via ${momoProvider.toUpperCase()}.`,
                   time: new Date().toLocaleTimeString()
                 };
 
                 setNotifications(prev => [confirmationMsg, ...prev]);
                 setTrip(null); 
               } catch (dbErr) {
-                console.error("Post-success handling error:", dbErr);
+                console.error("Post-success handling error inside Database write:", dbErr);
+                setErrorMessage(`Payment confirmed but local ledger update failed: ${dbErr.message}`);
               } finally {
                 setProcessing(false);
               }
@@ -142,7 +164,7 @@ export default function Payment() {
           setErrorMessage(`SDK Engine initialization exception: ${innerScriptErr.message}`);
           setProcessing(false);
         }
-      }, 100);
+      }, 150);
 
     } catch (err) {
       setErrorMessage(err.message);
@@ -184,21 +206,21 @@ export default function Payment() {
             <h3 className="text-xs font-black text-zinc-400 uppercase tracking-wider flex items-center gap-2">
               <User size={14} className="text-cyan-400" /> Manifest Verification Receipt
             </h3>
-            {passenger ? (
+            {passenger || trip ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-400 pt-1">
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">PASSENGER NAME</span>
-                  <span className="text-white font-bold">{passenger.fullName || 'patrick chitambo'}</span>
+                  <span className="text-white font-bold">{passenger?.full_name || passenger?.fullName || 'patrick chitambo'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-cyan-400/20 shadow-[0_0_15px_rgba(0,240,255,0.03)]">
                   <span className="text-[10px] text-cyan-400 font-bold block mb-1">SECURE ALLOCATED SEAT</span>
                   <span className="text-cyan-400 font-black text-sm tracking-widest">
-                    [ {trip?.seat || 'VERIFIED IN DATABASE'} ]
+                    [ {trip?.seat || 'L3'} ]
                   </span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">DEPARTING BOARDING HUB</span>
-                  <span className="text-zinc-300 font-bold">{passenger.fromLocation || 'Mwasambo'}</span>
+                  <span className="text-zinc-300 font-bold">{passenger?.departing_center || passenger?.fromLocation || trip?.from || 'Mwasambo'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">ESTIMATED LAUNCH TIMING</span>
@@ -239,9 +261,9 @@ export default function Payment() {
                   <input 
                     type="tel"
                     required
-                    placeholder="888123456"
+                    placeholder="893059655"
                     value={momoNumber.replace(/^\+265/, '')}
-                    onChange={(e) => setMomoNumber('+265' + e.target.value.trim())}
+                    onChange={(e) => setMomoNumber('+265' + e.target.value.replace(/\s+/g, ''))}
                     className="w-full bg-zinc-900/40 border border-zinc-800 rounded-xl py-2.5 pl-14 pr-4 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
                   />
                 </div>
