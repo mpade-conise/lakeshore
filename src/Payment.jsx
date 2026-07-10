@@ -26,12 +26,14 @@ export default function Payment() {
     if (storedPassenger) {
       const parsedPassenger = JSON.parse(storedPassenger);
       setPassenger(parsedPassenger);
+      // Fallback fallback extraction strategy safely mapping incoming strings
       setMomoNumber(parsedPassenger.phone_number || parsedPassenger.phoneNumber || '');
     }
     
     if (storedTrip) {
       setTrip(JSON.parse(storedTrip));
     } else {
+      // Safe fallback configuration if step 3 cache structural variables are out of sync
       setTrip({
         id: 'SECURE-MANIFEST',
         seat: 'L3',
@@ -46,20 +48,35 @@ export default function Payment() {
     setProcessing(true);
     setErrorMessage('');
 
-    // Ensure strict uniqueness for tx_ref to avoid PayChangu API validation failures
+    // Ensure strict uniqueness for tx_ref to avoid PayChangu API 400 validation failures
     const txReference = `LAKE-TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const targetAmount = 5000; // Fixed structural booking fee (MWK 5,000)
 
     try {
+      // Check if PayChangu library is properly loaded into window context
       if (typeof window.PaychanguCheckout === 'undefined') {
         throw new Error("PayChangu SDK not initialized. Please ensure popup.js script is included in your index.html head.");
       }
 
-      // Hard DOM Reset for lingering elements
+      // DOM Guard: Verify document body state explicitly
+      if (!document || !document.body) {
+        throw new Error("DOM Engine unready. Please trigger transaction stack re-evaluation.");
+      }
+
+      // ====================================================================
+      // HARD DOM RESET: Clean up broken overlays/iframes from previous crashes
+      // ====================================================================
       const existingIframes = document.querySelectorAll('iframe[src*="paychangu"]');
       existingIframes.forEach(iframe => iframe.remove());
 
-      // Safely fetch user/auth defaults
+      const brokenOverlays = document.querySelectorAll('div[style*="position: fixed"]');
+      brokenOverlays.forEach(div => {
+        if (div.textContent.includes('technical error') || div.innerHTML === '') {
+          div.remove();
+        }
+      });
+
+      // Fetch active auth session safely without breaking context execution
       let userId = passenger?.id || "1e58f1a5-5a8f-4013-87bf-9cede57cf326"; 
       let userEmail = passenger?.booking_email || passenger?.email || "conise@gmail.com";
       
@@ -73,34 +90,24 @@ export default function Payment() {
         console.warn("Supabase session check bypassed for gateway setup:", authErr.message);
       }
 
-      // Parse first and last name as required by standard customer schema split
-      const fullName = passenger?.full_name || passenger?.fullName || "Patrick Chitambo";
-      const nameParts = fullName.trim().split(/\s+/);
-      const firstName = nameParts[0] || "Patrick";
-      const lastName = nameParts.slice(1).join(" ") || "Chitambo";
-
-      // Small delay to ensure DOM updates and wrapper exists
+      // ====================================================================
+      // LIVE PAYCHANGU INLINE DEPOSIT POPUP INITIALIZATION
+      // ====================================================================
+      // Deferring execution gives the browser window 150ms to mount target parent frames properly
       setTimeout(() => {
         try {
           window.PaychanguCheckout({
-            "public_key": import.meta.env.VITE_PAYCHANGU_PUBLIC_KEY, 
-            "tx_ref": txReference,
-            "amount": targetAmount,
-            "currency": "MWK",
-            "callback_url": window.location.origin + "/payment-success", // Appended verification redirect destination
-            "return_url": window.location.href,                          // Fallback destination on failure/cancel
-            "customer": {
-              "email": userEmail,
-              "first_name": firstName,
-              "last_name": lastName
-            },
-            "customization": {
-              "title": "Lakeshore Booking Settlement",
-              "description": `Seat ${trip?.seat || "L3"} departing from ${trip?.from || "Mwasambo"}`
-            },
-            "meta": {
-              "momo_number": momoNumber,
-              "momo_provider": momoProvider
+            public_key: import.meta.env.VITE_PAYCHANGU_PUBLIC_KEY, 
+            tx_ref: txReference,
+            amount: targetAmount,
+            currency: "MWK",
+            callback_url: window.location.href, 
+            customer_id: userId,
+            customer_name: passenger?.full_name || passenger?.fullName || "Patrick Chitambo",
+            customer_email: userEmail,
+            custom_fields: {
+              seat_node: trip?.seat || "L3",
+              departing_center: trip?.from || "Mwasambo"
             },
             onclose: () => {
               setProcessing(false);
@@ -113,6 +120,9 @@ export default function Payment() {
             },
             onsuccess: async (response) => {
               try {
+                // ====================================================================
+                // SUPABASE PRODUCTION MUTATION LOOP
+                // ====================================================================
                 // Settle and finalize state tracking structures inside 'lakeshore' table
                 const { error: dbError } = await supabase
                   .from('lakeshore')
@@ -128,14 +138,18 @@ export default function Payment() {
 
                 if (dbError) throw dbError;
 
+                // Clear out local trip parameters to settle process flow
                 localStorage.removeItem('lakeshore_selected_trip');
 
-                setNotifications(prev => [{
+                // Dispatch success statement packet to the notification deck log
+                const confirmationMsg = {
                   id: txReference,
                   type: 'success',
-                  text: `SUCCESS // Booking Finalized! Record mutated to PAID. Ref: ${txReference}. Confirmed receipt via ${momoProvider.toUpperCase()}.`,
+                  text: `SUCCESS // Booking Finalized! Record mutated to PAID. Ref: ${txReference}. Confirmed receipt of MWK ${targetAmount.toLocaleString()} via ${momoProvider.toUpperCase()}.`,
                   time: new Date().toLocaleTimeString()
-                }, ...prev]);
+                };
+
+                setNotifications(prev => [confirmationMsg, ...prev]);
                 setTrip(null); 
               } catch (dbErr) {
                 console.error("Post-success handling error inside Database write:", dbErr);
@@ -154,6 +168,12 @@ export default function Payment() {
 
     } catch (err) {
       setErrorMessage(err.message);
+      setNotifications(prev => [{
+        id: `ERR-${Date.now()}`,
+        type: 'error',
+        text: `Gateway Interface Failure: ${err.message}`,
+        time: new Date().toLocaleTimeString()
+      }, ...prev]);
       setProcessing(false);
     }
   };
@@ -250,9 +270,6 @@ export default function Payment() {
               </div>
 
             </div>
-
-            {/* MANDATORY TARGET HOOK DOM ELEMENT FOR POPUP.JS INTERNAL APPENDCHILD FLOW */}
-            <div id="wrapper" />
           </div>
 
         </form>
