@@ -1,6 +1,6 @@
 // src/AdminDashboard.jsx
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { 
   Users, Ticket, CreditCard, RefreshCw, CheckCircle2, 
   XCircle, AlertCircle, ArrowUpRight, ShieldCheck,
