@@ -19,9 +19,10 @@ export default function SearchTrips({ onBookingSuccess }) {
   const [takenSeats, setTakenSeats] = useState([]);
 
   // Generate your complete triple-column seating layout row sequences (1 to 20)
-  const leftSeats = Array.from({ length: 20 }, (_, i) => `L${i + 1}`);
-  const middleSeats = Array.from({ length: 20 }, (_, i) => `M${i + 1}`);
-  const rightSeats = Array.from({ length: 20 }, (_, i) => `R${i + 1}`);
+  const leftSeats = Array.from({ length: 7 }, (_, i) => `L${i + 1}`);
+  const middleleftSeats = Array.from({ length: 7 }, (_, i) => `ML${i + 1}`);
+   const middleRightSeats = Array.from({ length: 7 }, (_, i) => `MR${i + 1}`);
+  const rightSeats = Array.from({ length: 7 }, (_, i) => `R${i + 1}`);
 
   useEffect(() => {
     const initializeBookingData = async () => {
@@ -101,7 +102,7 @@ export default function SearchTrips({ onBookingSuccess }) {
         from: village,
         to: 'MUBAS Main Campus',
         time: '08:00 AM',
-        fare: 'MWK 5,000',
+        fare: 'MWK 5200',
         seat: selectedSeat
       }));
 
@@ -204,7 +205,7 @@ export default function SearchTrips({ onBookingSuccess }) {
               {/* Dynamic Selection Readout */}
               <div className="bg-zinc-900/30 border border-zinc-900 rounded-xl p-3 text-[11px] text-zinc-400 space-y-1.5">
                 <div className="flex justify-between"><span>Selected Vector:</span> <span className="text-cyan-400 font-bold">{selectedSeat || 'NONE'}</span></div>
-                <div className="flex justify-between"><span>Regulatory Fee:</span> <span className="text-zinc-200">MWK 5,000</span></div>
+                <div className="flex justify-between"><span>Regulatory Fee:</span> <span className="text-zinc-200">MWK 5,200</span></div>
               </div>
 
               {/* Checkbox for service fee */}
