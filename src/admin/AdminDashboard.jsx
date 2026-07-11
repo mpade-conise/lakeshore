@@ -135,7 +135,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Automated core cloud payout executor routine
   const handleAdminWithdrawal = async () => {
     if (financialStats.withdrawableBalance <= 0) {
       setStatusMessage({ type: 'error', text: 'No authorized withdrawable balance packets found.' });
@@ -156,11 +155,9 @@ export default function AdminDashboard() {
       const result = await response.json();
       if (!response.ok || result.error) throw new Error(result.error || 'Gateway validation rejected.');
 
-      // Mark local state targets as paid out to reconcile variables smoothly
       setStatusMessage({ type: 'success', text: `MWK ${financialStats.withdrawableBalance.toLocaleString()} successfully cleared to bank treasury.` });
       fetchAdminData();
     } catch (err) {
-      // Fallback Engine: Handle gracefully if edge functions haven't been deployed yet
       console.warn("Edge Function offline, running localized manual reconciliation matrix backup...");
       
       const unliquidatedIds = registrations
@@ -182,7 +179,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Native Print / PDF generator triggering isolated DOM window frames
   const triggerManifestPrint = () => {
     window.print();
   };
@@ -192,7 +188,6 @@ export default function AdminDashboard() {
     return u.full_name?.toLowerCase().includes(s) || u.phone_number?.includes(s) || u.booking_email?.toLowerCase().includes(s);
   });
 
-  // Filter out users who have explicitly secured and paid for their seats
   const confirmedPassengers = registrations.filter(u => u.payment_status === 'SUCCESSFUL' || u.payment_status === 'PAID');
 
   return (
@@ -200,10 +195,11 @@ export default function AdminDashboard() {
       
       {/* NATIVE PRINT/PDF MEDIA OVERRIDE STYLING */}
       <style>{`
+        #printable-manifest-area { display: none; }
         @media print {
           body * { visibility: hidden; background: transparent !important; color: #000 !important; }
           #printable-manifest-area, #printable-manifest-area * { visibility: visible; }
-          #printable-manifest-area { position: absolute; left: 0; top: 0; width: 100%; font-family: monospace; }
+          #printable-manifest-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; font-family: monospace; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -417,8 +413,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* HIDDEN MANIFEST PRINT COMPONENT CONTAINER */}
-      <div id="printable-manifest-area" className="hidden p-8 text-black">
+      {/* MANIFEST PRINT LAYOUT CONTAINER */}
+      <div id="printable-manifest-area" className="text-black">
         <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
           <h1 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>LAKESHORE STUDENT TRANSPORT SYSTEMS</h1>
           <p style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>Official Confirmed Passenger & Seat Allocation Manifest</p>
@@ -450,13 +446,13 @@ export default function AdminDashboard() {
           </tbody>
         </table>
 
-        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'between', fontSize: '11px' }}>
+        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
           <div>
             <p><strong>Total Confirmed Bookings:</strong> {confirmedPassengers.length}</p>
             <p><strong>Total Revenue Realized:</strong> MWK {financialStats.totalAccumulated.toLocaleString()}</p>
           </div>
           <div style={{ textAlign: 'right', marginTop: 'auto' }}>
-            <p style={{ borderTop: '1px solid #000', width: '200px', pt: '4px' }}>Authorized Command Signature</p>
+            <p style={{ borderTop: '1px solid #000', width: '200px', paddingTop: '4px' }}>Authorized Command Signature</p>
           </div>
         </div>
       </div>
