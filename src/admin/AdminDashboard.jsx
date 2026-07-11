@@ -6,7 +6,7 @@ import {
   XCircle, AlertCircle, ArrowUpRight, ShieldCheck,
   Layers, BarChart3, Wallet, Eye, Search, Phone, Tag, Save, Printer
 } from 'lucide-react';
-import './print.css'; // Direct decoupled style injection
+import '../print.css'; // Direct decoupled style injection
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('ledger');
