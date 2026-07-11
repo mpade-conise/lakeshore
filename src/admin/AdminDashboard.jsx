@@ -17,8 +17,8 @@ export default function AdminDashboard() {
   // Route Pricing Config State
   const [routePrices, setRoutePrices] = useState({
     'mwasambo-mubas': 65000,
-    'benga-mubas': 5000,
-    'lilongwe-mubas': 25000
+    'benga-mubas': 5000
+   
   });
   const [editingPrices, setEditingPrices] = useState({ ...routePrices });
   const [savingPrices, setSavingPrices] = useState(false);
