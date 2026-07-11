@@ -48,7 +48,7 @@ export default function Payment() {
 
     // Ensure strict uniqueness for tx_ref to avoid PayChangu API validation failures
     const txReference = `LAKE-TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const targetAmount = 5000; // Fixed structural booking fee (MWK 5,000)
+    const targetAmount = 5200; // Fixed structural booking fee (MWK 5,200)
 
     try {
       if (typeof window.PaychanguCheckout === 'undefined') {
