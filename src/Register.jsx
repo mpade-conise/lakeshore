@@ -238,11 +238,10 @@ export default function Register({ onRegistrationSuccess }) {
                 onChange={(e) => setFormData({...formData, departingCenter: e.target.value})}
                 className="w-full bg-zinc-900/30 border border-zinc-800 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors appearance-none cursor-pointer"
               >
-                <option value="" disabled className="bg-zinc-950 text-zinc-600">-- Choose your localized boarding hub --</option>
-                <option value="Mwasambo" className="bg-zinc-950 text-white">Mwasambo Hub</option>
-                <option value="Benga" className="bg-zinc-950 text-white">Benga Station</option>
+                <option value="" disabled className="bg-zinc-950 text-zinc-600">-- Choose your departing center --</option>
+                <option value="Mwasambo" className="bg-zinc-950 text-white">Mwasambo turn off</option>
                 <option value="Kamuzu Road Salima" className="bg-zinc-950 text-white">Kamuzu Road Salima</option>
-                <option value="Nkhotakota Boma" className="bg-zinc-950 text-white">Nkhotakota Boma Terminal</option>
+              
               </select>
             </div>
           </div>
@@ -257,7 +256,7 @@ export default function Register({ onRegistrationSuccess }) {
               <Loader2 size={14} className="animate-spin text-cyan-400" />
             ) : (
               <>
-                <span>Commit Registry & Synchronize Table</span>
+                <span>Commit Registry & save</span>
                 <ShieldCheck size={14} className="text-cyan-400" />
               </>
             )}
