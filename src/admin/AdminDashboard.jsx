@@ -34,6 +34,15 @@ export default function AdminDashboard() {
   const [processingAction, setProcessingAction] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
+  // Paychangu Provider-to-RefID Registry Mapping Lookup Table
+  const operatorRefs = {
+    'airtel': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
+    'airtel money': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
+    'tnm': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
+    'tnm mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
+    'mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca'
+  };
+
   useEffect(() => {
     fetchAdminData();
     loadConfiguredPrices();
@@ -89,7 +98,7 @@ export default function AdminDashboard() {
           guardian_type_1, guardian_phone_1, guardian_type_2, guardian_phone_2,
           departing_center, updated_at, booking_email, village_or_center,
           selected_seat, service_fee_accepted, booking_amount, payment_status,
-          payment_reference, momo_number, momo_provider, payment_completed_at, role
+          payment_reference, momo_number, momo_provider, payment_completed_at, role, payout_completed
         `)
         .order('created_at', { ascending: false });
 
@@ -138,6 +147,67 @@ export default function AdminDashboard() {
       setStatusMessage({ type: 'error', text: `Sync Alert: ${err.message}` });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // INITIALIZE INDIVIDUAL PASSENGER MOBILE MONEY PAYOUT ON SUCCESS STATUS
+  const handleSinglePayout = async (account) => {
+    const providerKey = (account.momo_provider || '').toLowerCase().trim();
+    const targetOperatorRef = operatorRefs[providerKey];
+
+    if (!account.momo_number) {
+      setStatusMessage({ type: 'error', text: 'Aborted: Target user profile lacks a Mobile Money destination number.' });
+      return;
+    }
+
+    if (!targetOperatorRef) {
+      setStatusMessage({ type: 'error', text: `Aborted: Unrecognized Mobile Money operator context value: "${account.momo_provider}"` });
+      return;
+    }
+
+    setProcessingAction(account.id);
+    setStatusMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch('https://api.paychangu.com/mobile-money/payouts/initialize', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+          // Add your standard Authorization Server/Secret token headers here if required outside standard sandbox execution environments
+        },
+        body: JSON.stringify({
+          mobile: account.momo_number,
+          mobile_money_operator_ref_id: targetOperatorRef,
+          amount: String(account.booking_amount),
+          charge_id: `CHG-${account.id.substring(0, 8).toUpperCase()}`,
+          email: account.booking_email || 'billing@lakeshore.edu',
+          first_name: account.full_name?.split(' ')[0] || 'Student',
+          last_name: account.full_name?.split(' ')[1] || 'Passenger',
+          transaction_status: "SUCCESSFUL"
+        })
+      });
+
+      const outcome = await response.json();
+
+      if (outcome.status === 'success') {
+        // Flag local record as completed inside table schema state
+        const { error: patchError } = await supabase
+          .from('lakeshore')
+          .update({ payout_completed: true })
+          .eq('id', account.id);
+
+        if (patchError) throw patchError;
+
+        setStatusMessage({ type: 'success', text: `Payout of MWK ${account.booking_amount} to ${account.full_name} processed cleanly.` });
+        fetchAdminData();
+      } else {
+        throw new Error(outcome.message || 'Paychangu engine rejected transaction request flags.');
+      }
+    } catch (err) {
+      setStatusMessage({ type: 'error', text: `Payout Disburse Exception: ${err.message}` });
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -222,7 +292,7 @@ export default function AdminDashboard() {
                     <th className="p-4">HUB ROUTE VECTOR</th>
                     <th className="p-4">SEAT</th>
                     <th className="p-4">PAY STATUS</th>
-                    <th className="p-4 text-right">INSPECT</th>
+                    <th className="p-4 text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900 text-zinc-300">
@@ -231,25 +301,41 @@ export default function AdminDashboard() {
                   ) : filteredRegistrations.length === 0 ? (
                     <tr><td colSpan="6" className="p-8 text-center text-zinc-600">No profile matches found inside database.</td></tr>
                   ) : (
-                    filteredRegistrations.map((account) => (
-                      <tr key={account.id} className="hover:bg-zinc-900/20 transition-colors">
-                        <td className="p-4 font-bold text-white whitespace-nowrap">{account.full_name || 'No Identity Confirmed'}</td>
-                        <td className="p-4 space-y-0.5">
-                          <div className="text-zinc-400 font-semibold">{account.phone_number || 'N/A'}</div>
-                          <div className="text-zinc-600 text-[11px] truncate max-w-[150px]">{account.booking_email}</div>
-                        </td>
-                        <td className="p-4"><span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300">{account.departing_center || 'None'}</span></td>
-                        <td className="p-4 font-bold text-cyan-400">{account.selected_seat || 'None'}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase ${account.payment_status === 'SUCCESSFUL' || account.payment_status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                            {account.payment_status || 'UNPAID'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <button onClick={() => setSelectedUser(account)} className="p-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white rounded-lg"><Eye size={13} /></button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredRegistrations.map((account) => {
+                      const isPaid = account.payment_status === 'SUCCESSFUL' || account.payment_status === 'PAID';
+                      return (
+                        <tr key={account.id} className="hover:bg-zinc-900/20 transition-colors">
+                          <td className="p-4 font-bold text-white whitespace-nowrap">{account.full_name || 'No Identity Confirmed'}</td>
+                          <td className="p-4 space-y-0.5">
+                            <div className="text-zinc-400 font-semibold">{account.phone_number || 'N/A'}</div>
+                            <div className="text-zinc-600 text-[11px] truncate max-w-[150px]">{account.booking_email}</div>
+                          </td>
+                          <td className="p-4"><span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300">{account.departing_center || 'None'}</span></td>
+                          <td className="p-4 font-bold text-cyan-400">{account.selected_seat || 'None'}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase ${isPaid ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                              {account.payment_status || 'UNPAID'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right space-x-2 flex items-center justify-end">
+                            {isPaid && !account.payout_completed ? (
+                              <button 
+                                onClick={() => handleSinglePayout(account)}
+                                disabled={processingAction === account.id}
+                                className="px-2.5 py-1 bg-emerald-500 text-black font-black text-[10px] uppercase tracking-wider rounded hover:bg-emerald-400 transition-all disabled:opacity-40"
+                              >
+                                {processingAction === account.id ? 'SENDING...' : 'Disburse MoMo'}
+                              </button>
+                            ) : account.payout_completed ? (
+                              <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider bg-zinc-900 px-2 py-1 rounded border border-zinc-800">Disbursed</span>
+                            ) : (
+                              <span className="text-[10px] text-zinc-500/40 italic">Awaiting Payment</span>
+                            )}
+                            <button onClick={() => setSelectedUser(account)} className="p-1.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white rounded-lg"><Eye size={13} /></button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -281,8 +367,8 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-black text-white uppercase tracking-wider">Execute Global Withdrawal</h3>
               <p className="text-xs text-zinc-500">Disburse completely processed funds out from gateway pipelines to master account balance targets.</p>
             </div>
-            <button disabled={financialStats.withdrawableBalance === 0} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
-              <Wallet size={14} /> Cash Out Reserves
+            <button disabled={financialStats.withdrawableBalance === 0 || processingAction === 'withdraw'} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
+              <Wallet size={14} /> {processingAction === 'withdraw' ? 'PROCESSING...' : 'Cash Out Reserves'}
             </button>
           </div>
         </div>
@@ -375,6 +461,10 @@ export default function AdminDashboard() {
             </div>
             <div className="space-y-3 text-xs">
               <div><span className="text-zinc-600 block text-[10px]">EMAIL ACCOUNT</span><span className="text-zinc-200">{selectedUser.booking_email}</span></div>
+              <div><span className="text-zinc-600 block text-[10px]">PHONE NUMBER</span><span className="text-zinc-200">{selectedUser.phone_number || 'N/A'}</span></div>
+              {selectedUser.momo_number && (
+                <div><span className="text-zinc-600 block text-[10px]">MOBILE MONEY DESTINATION</span><span className="text-amber-400 font-bold">{selectedUser.momo_number} ({selectedUser.momo_provider})</span></div>
+              )}
               <div><span className="text-zinc-600 block text-[10px]">STAGING CENTER</span><span className="text-cyan-400 font-bold">{selectedUser.departing_center}</span></div>
               <div><span className="text-zinc-600 block text-[10px]">TRANSACTION AMOUNT</span><span className="text-emerald-400 font-bold">MWK {parseFloat(selectedUser.booking_amount || 0).toLocaleString()}</span></div>
             </div>
