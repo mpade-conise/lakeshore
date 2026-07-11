@@ -1,0 +1,33 @@
+/* src/print.css */
+
+/* Hidden by default in standard browser view */
+#printable-manifest-area {
+  display: none !important;
+}
+
+@media print {
+  /* Hide the entire React App shell and UI dashboard layout elements */
+  body *, 
+  #root *,
+  .no-print {
+    visibility: hidden !important;
+    background: transparent !important;
+  }
+
+  /* Exclusively force isolate the manifest printing node container */
+  #printable-manifest-area, 
+  #printable-manifest-area * {
+    visibility: visible !important;
+  }
+
+  #printable-manifest-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    color: #000 !important;
+    font-family: monospace;
+    background: #fff !important;
+  }
+}
