@@ -21,8 +21,11 @@ export default function SearchTrips({ onBookingSuccess }) {
   // Generate your complete triple-column seating layout row sequences (1 to 20)
   const leftSeats = Array.from({ length: 7 }, (_, i) => `L${i + 1}`);
   const middleleftSeats = Array.from({ length: 7 }, (_, i) => `ML${i + 1}`);
-   const middleRightSeats = Array.from({ length: 7 }, (_, i) => `MR${i + 1}`);
+  const middleRightSeats = Array.from({ length: 7 }, (_, i) => `MR${i + 1}`);
   const rightSeats = Array.from({ length: 7 }, (_, i) => `R${i + 1}`);
+
+  // Combines both ML and MR structures into the single array mapped by your JSX layout
+  const middleSeats = [...middleleftSeats, ...middleRightSeats];
 
   useEffect(() => {
     const initializeBookingData = async () => {
