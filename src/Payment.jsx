@@ -36,7 +36,7 @@ export default function Payment() {
         id: 'SECURE-MANIFEST',
         seat: 'L3',
         from: 'Mwasambo',
-        fare: 'MWK 5,000'
+        fare: 'MWK 5,200'
       });
     }
   }, []);
