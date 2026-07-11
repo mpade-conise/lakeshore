@@ -1,7 +1,7 @@
 // src/Home.jsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { BarChart3, MapPin, Users, TrendingUp, Bus, Loader2 } from 'lucide-react';
+import { BarChart3, MapPin, Users, TrendingUp, Bus, Loader2, Info, ArrowRight } from 'lucide-react';
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -12,40 +12,55 @@ export default function Home() {
   });
   const [bookedPassengers, setBookedPassengers] = useState([]);
   const [routeStats, setRouteStats] = useState([]);
+  
+  // Notice board pricing state
+  const [noticePrices, setNoticePrices] = useState({
+    'mwasambo-mubas': 65000,
+    'benga-mubas': 5000,
+    'lilongwe-mubas': 25000
+  });
 
   useEffect(() => {
+    // Synchronize informational prices from administrator configuration
+    const savedPrices = localStorage.getItem('lakeshore_route_prices');
+    if (savedPrices) {
+      try {
+        setNoticePrices(JSON.parse(savedPrices));
+      } catch (e) {
+        console.error("Error reading price matrix configuration:", e);
+      }
+    }
+
     async function fetchLiveDashboardData() {
       try {
         setLoading(true);
 
-        // 1. Fetch live passenger booking records from the "lakeshore" table
+        // 1. Fetch data explicitly naming key columns to bypass decryption policies
         const { data: passengers, error: fetchError } = await supabase
           .from('lakeshore') 
-          .select('*')
+          .select('id, full_name, selected_seat, departing_center, created_at')
           .order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
 
         const recordArray = passengers || [];
 
-        // 2. Compute dynamic metrics based on real-time table schema
+        // 2. Compute dynamic metrics based on real-time table state
         const total = recordArray.length;
         
-        // Extract unique locations via "departing_center" column
         const uniqueCenters = [...new Set(recordArray.map(p => p.departing_center).filter(Boolean))];
-        const activeCentersCount = uniqueCenters.length || 4; // Fallback baseline configuration if empty
+        const activeCentersCount = uniqueCenters.length || 4; 
 
-        // Calculate seats filled today matching current UTC/local day boundary
         const todayStr = new Date().toISOString().split('T')[0];
         const filledToday = recordArray.filter(p => p.created_at && p.created_at.startsWith(todayStr)).length;
 
         setAnalytics({
           totalBookings: total,
           activeRoutes: activeCentersCount,
-          seatsFilledToday: filledToday || total, // Fallback configuration to total if none recorded today
+          seatsFilledToday: filledToday || total, 
         });
 
-        // 3. Populate passenger roster array using valid table column attributes
+        // 3. Populate passenger roster array
         const formattedPassengers = recordArray.map((p, idx) => ({
           id: p.id || `gen-${idx}`,
           name: p.full_name || 'Anonymous Student',
@@ -54,7 +69,7 @@ export default function Home() {
         }));
         setBookedPassengers(formattedPassengers);
 
-        // 4. Calculate dynamic route demand distribution percentages using "departing_center"
+        // 4. Calculate dynamic route demand distribution percentages
         const routeCounts = {};
         recordArray.forEach(p => {
           const loc = p.departing_center || 'Other Routes';
@@ -66,7 +81,6 @@ export default function Home() {
           percentage: total > 0 ? Math.round((routeCounts[route] / total) * 100) : 0
         })).sort((a, b) => b.percentage - a.percentage);
 
-        // Fallback baseline configuration if the table database is completely fresh
         setRouteStats(derivedStats.length > 0 ? derivedStats : [
           { name: 'MUBAS Main Campus', percentage: 75 },
           { name: 'Lakeshore Express', percentage: 25 }
@@ -102,9 +116,28 @@ export default function Home() {
         </p>
       </div>
 
+      {/* PRICE ADVISORY BANNER PANEL (STUDENT PORTAL INFORMATION VECTOR) */}
+      <div className="border border-zinc-900 bg-zinc-950/40 p-4 rounded-2xl space-y-3">
+        <div className="flex items-center gap-2 text-amber-500 text-xs font-bold uppercase tracking-wider">
+          <Info size={14} /> Transport Route Price Advisories
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Object.entries(noticePrices).map(([routeKey, value]) => (
+            <div key={routeKey} className="bg-zinc-950/60 border border-zinc-900/80 px-3 py-2.5 rounded-xl flex items-center justify-between text-xs">
+              <span className="text-zinc-400 font-medium capitalize flex items-center gap-1.5">
+                {routeKey.split('-')[0]} <ArrowRight size={10} className="text-zinc-600" /> {routeKey.split('-')[1] || 'MUBAS'}
+              </span>
+              <span className="text-white font-black tracking-tight">MWK {value.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-zinc-600 italic">
+          * Note: Prices above serve as reference guidelines for travel budgeting, not exact transactional validation values.
+        </p>
+      </div>
+
       {/* METRIC CARD MATRIX */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        
         {/* TOTAL BOOKINGS */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 sm:p-4 text-cyan-500/10"><TrendingUp size={36} /></div>
@@ -193,7 +226,7 @@ export default function Home() {
                 </table>
               </div>
 
-              {/* ULTRA-MOBILE OPTIMIZED CARD VIEW (Triggers on phone displays) */}
+              {/* ULTRA-MOBILE OPTIMIZED CARD VIEW */}
               <div className="block sm:hidden space-y-2 max-h-72 overflow-y-auto pr-1">
                 {bookedPassengers.map((passenger) => (
                   <div key={passenger.id} className="bg-zinc-900/30 border border-zinc-900/80 p-3 rounded-xl flex items-center justify-between gap-3">
