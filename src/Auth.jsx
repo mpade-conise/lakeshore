@@ -46,7 +46,7 @@ export default function Auth({ onAuthSuccess }) {
               onClick={() => setActiveSubView('register')}
               className="text-xs text-zinc-500 hover:text-cyan-400 font-bold transition-colors font-mono"
             >
-              [ NEW ENTITY? PROVISION USER CORE NODE ]
+              [ Register]
             </button>
           </div>
         </div>
