@@ -94,7 +94,7 @@ export default function Login({ onAuthSuccess }) {
           ) : (
             <>
               <LogIn size={14} />
-              <span>AUTHORIZE WORKSPACE INTERFACE</span>
+              <span>log in</span>
             </>
           )}
         </button>
