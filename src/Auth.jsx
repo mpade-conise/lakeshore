@@ -60,7 +60,7 @@ export default function Auth({ onAuthSuccess }) {
               onClick={() => setActiveSubView('login')}
               className="text-xs text-zinc-500 hover:text-fuchsia-400 font-bold transition-colors font-mono"
             >
-              [ ALREADY MAPPED? SWITCH TO AUTHENTICATION ]
+             Register
             </button>
           </div>
         </div>
