@@ -53,11 +53,7 @@ export default function Home() {
         const total = recordArray.length;
         
         const uniqueCenters = [...new Set(recordArray.map(p => p.departing_center).filter(Boolean))];
-        const activeCentersCount = uniqueCenters.length; 
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const filledToday = recordArray.filter(p => p.created_at && p.created_at.startsWith(todayStr)).length;
-
+        
         setAnalytics({
           totalBookings: total,
           activeRoutes: uniqueCenters[0] || 'Not set',
