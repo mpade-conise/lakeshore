@@ -53,7 +53,7 @@ export default function Payment() {
       if (!/^(265)?[0-9]{9}$/.test(walletDigits)) throw new Error('Enter a valid Malawi mobile money number.');
       if (typeof window.PaychanguCheckout !== 'function') throw new Error('PayChangu checkout could not be loaded. Refresh the page and try again.');
 
-      const { data: booking, error: prepareError } = await supabase.functions.invoke('prepare-booking-payment', { body: {} });
+      const { data: booking, error: prepareError } = await supabase.functions.invoke('prepare-booking-payment', { body: { momo_number: momoNumber, momo_provider: momoProvider } });
       if (prepareError) throw prepareError;
       if (!booking?.tx_ref || !Number.isSafeInteger(Number(booking.amount)) || Number(booking.amount) <= 0) throw new Error(booking?.error || 'The server did not return a valid booking payment.');
 
