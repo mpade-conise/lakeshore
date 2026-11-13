@@ -114,6 +114,11 @@ button { cursor: pointer; }
 }
 
 /* Visual compatibility layer: restyles existing screens without changing their behaviour. */
+.font-mono { font-family: inherit !important; }
+.tracking-widest { letter-spacing: .09em; }
+.shadow-2xl { box-shadow: 0 24px 60px #17243b18 !important; }
+.rounded-2xl { border-radius: 18px; }
+.rounded-xl { border-radius: 13px; }
 .bg-black { background-color: #f4f7fb !important; }
 .bg-zinc-950 { background-color: #fff !important; }
 .bg-zinc-950\/40, .bg-zinc-950\/60 { background-color: #f4f7fb !important; }
