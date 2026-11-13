@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const walletDigits = typeof body.momo_number === "string" ? body.momo_number.replace(/\D/g, "") : "";
     const provider = body.momo_provider === "tnm" ? "TNM Mpamba" : body.momo_provider === "airtel" ? "Airtel Money" : "";
-    if (!/^(265)?[0-9]{9}$/.test(walletDigits) || !provider) return json({ error: "A valid Malawi mobile money number and provider are required." }, 400);
+    if (!/^(265)?0?[0-9]{9}$/.test(walletDigits) || !provider) return json({ error: "A valid Malawi mobile money number and provider are required." }, 400);
     const normalizedWallet = `+265${walletDigits.slice(-9)}`;
 
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
