@@ -60,8 +60,8 @@ export default function Home() {
 
         setAnalytics({
           totalBookings: total,
-          activeRoutes: activeCentersCount,
-          seatsFilledToday: recordArray.filter(p => Boolean(p.selected_seat)).length, 
+          activeRoutes: uniqueCenters[0] || 'Not set',
+          seatsFilledToday: recordArray[0]?.selected_seat || 'Not selected', 
         });
 
         // 3. Populate passenger roster array
