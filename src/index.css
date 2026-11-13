@@ -143,3 +143,69 @@ main .rounded-2xl { box-shadow: 0 5px 20px #23395b08; }
 main input, main select, main textarea { color: #17243b; }
 main input::placeholder, main textarea::placeholder { color: #9aa8ba; }
 main button:focus-visible, aside button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+
+/* Page-level refinement: presentation only; existing component state and actions remain unchanged. */
+.app-content > div { min-width: 0; }
+.app-content h2 { color: #17243b !important; font-size: clamp(19px, 2vw, 25px) !important; font-weight: 850 !important; letter-spacing: -.035em !important; line-height: 1.25; }
+.app-content h3, .app-content h4 { letter-spacing: -.015em; }
+.app-content form { min-width: 0; }
+.app-content form.bg-zinc-950, .app-content .bg-zinc-950 { border-color: #e5ebf3 !important; box-shadow: 0 8px 26px #1b35520a; }
+.app-content input:not([type="checkbox"]):not([type="radio"]), .app-content select, .app-content textarea { min-height: 42px; border: 1px solid #dce5f0 !important; border-radius: 11px !important; background: #f8fafd !important; color: #17243b !important; font-size: 13px !important; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.app-content input:not([type="checkbox"]):not([type="radio"]):focus, .app-content select:focus, .app-content textarea:focus { border-color: #6a9cf4 !important; background: #fff !important; box-shadow: 0 0 0 3px #2563eb16; outline: 0; }
+.app-content input::placeholder, .app-content textarea::placeholder { color: #9aa8ba !important; }
+.app-content label { color: #64748b !important; font-size: 10px; font-weight: 800; letter-spacing: .055em; }
+.app-content button:not(.sidebar-link):not(.sidebar-logout) { transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease; }
+.app-content button:not(:disabled):active { transform: translateY(1px); }
+.app-content button:disabled { cursor: not-allowed; opacity: .58; }
+.app-content table { border-collapse: separate; border-spacing: 0; }
+.app-content table thead th { padding: 12px 10px; color: #7b8ba1 !important; background: #f7f9fc; font-size: 9px; letter-spacing: .09em; }
+.app-content table tbody td { padding: 13px 10px; border-bottom: 1px solid #edf1f6; color: #46566d; }
+.app-content table tbody tr:last-child td { border-bottom: 0; }
+.app-content table tbody tr:hover { background: #f8faff; }
+.app-content .max-w-5xl, .app-content .max-w-2xl { width: 100%; }
+.app-content .bg-zinc-900\/30, .app-content .bg-zinc-900\/20, .app-content .bg-zinc-900\/40 { border-color: #e7edf5 !important; }
+.app-content .border-t, .app-content .border-b { border-color: #e7edf5 !important; }
+.app-content .text-amber-400 { color: #b7791f !important; }
+.app-content .text-red-400, .app-content .text-red-500 { color: #c24141 !important; }
+.app-content .text-emerald-400, .app-content .text-emerald-500 { color: #16845b !important; }
+.app-content .bg-amber-500\/10 { background: #fff8e9 !important; border-color: #f3dfb6 !important; }
+.app-content .bg-red-500\/10 { background: #fff1f1 !important; border-color: #f2cccc !important; }
+.app-content .bg-emerald-500\/10 { background: #effaf4 !important; border-color: #ccebd9 !important; }
+
+/* Passenger home: clear price advisories, KPI hierarchy and roster surface. */
+.app-content .grid > .relative.overflow-hidden { min-height: 112px; }
+.app-content .grid > .relative.overflow-hidden > p:nth-of-type(2) { font-size: 27px; letter-spacing: -.04em; }
+.app-content .max-w-5xl .bg-zinc-950\/40 { background: #f8fafd !important; }
+.app-content .max-w-5xl .bg-zinc-950\/60 { background: #f8fafd !important; }
+
+/* Booking: distinguish available, selected and unavailable seat controls. */
+.app-content button.flex.items-center.justify-center.gap-1 { min-height: 38px; border-radius: 10px; font-weight: 800; }
+.app-content button.flex.items-center.justify-center.gap-1:not(.bg-cyan-400) { background: #f5f8fc !important; border-color: #e0e8f2 !important; color: #52647c !important; }
+.app-content button.flex.items-center.justify-center.gap-1:not(.bg-cyan-400):hover { background: #eaf2ff !important; border-color: #9bbcf4 !important; color: #1d4ed8 !important; }
+.app-content button.bg-cyan-400 { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; box-shadow: 0 5px 13px #2563eb2b !important; }
+.app-content .grid.grid-cols-3 { gap: clamp(10px, 2vw, 24px); }
+.app-content .grid.grid-cols-3 > div { min-width: 0; padding: 10px; border: 1px solid #edf1f6; border-radius: 14px; background: #fbfcfe; }
+
+/* Payment: strengthen the transaction summary and gateway feedback hierarchy. */
+.app-content .bg-zinc-950 .text-emerald-400 { font-weight: 800; }
+.app-content .max-h-56 > div { background: #f8fafd !important; border-color: #e7edf5 !important; }
+.app-content .max-h-56 > div p { color: #52647c !important; }
+
+/* Admin workspace: make tabs, financial metrics, data tables and detail modal consistent. */
+.admin-main .app-content > div { width: 100%; }
+.admin-main .app-content .bg-zinc-900\/80 { background: #f0f4fa !important; border-color: #e2e9f2 !important; }
+.admin-main .app-content button.bg-cyan-400, .admin-main .app-content button.bg-emerald-500, .admin-main .app-content button.bg-amber-500 { color: #fff !important; box-shadow: 0 5px 14px #1d4ed81c; }
+.admin-main .app-content .fixed.inset-0 > div { max-height: min(85vh, 720px); overflow-y: auto; background: #fff !important; border-color: #e3eaf3 !important; box-shadow: 0 24px 70px #10213d33; }
+.admin-main .app-content .fixed.inset-0 > div h3 { color: #17243b !important; }
+.admin-main .app-content .fixed.inset-0 > div .text-zinc-200 { color: #334155 !important; }
+
+@media (max-width: 640px) {
+  .app-content { overflow-x: clip; }
+  .app-content .grid.grid-cols-3 { gap: 6px; }
+  .app-content .grid.grid-cols-3 > div { padding: 6px 4px; }
+  .app-content button.flex.items-center.justify-center.gap-1 { min-height: 35px; padding-left: 3px; padding-right: 3px; font-size: 9px; }
+  .app-content form.bg-zinc-950, .app-content .bg-zinc-950 { padding: 16px; }
+  .admin-main .app-content table { min-width: 720px; }
+  .admin-main .app-content .overflow-x-auto { max-width: 100%; }
+}
+
