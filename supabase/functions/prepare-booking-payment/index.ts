@@ -27,6 +27,12 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) return json({ error: "Invalid or expired session." }, 401);
 
+    const body = await req.json().catch(() => ({}));
+    const walletDigits = typeof body.momo_number === "string" ? body.momo_number.replace(/\D/g, "") : "";
+    const provider = body.momo_provider === "tnm" ? "TNM Mpamba" : body.momo_provider === "airtel" ? "Airtel Money" : "";
+    if (!/^(265)?[0-9]{9}$/.test(walletDigits) || !provider) return json({ error: "A valid Malawi mobile money number and provider are required." }, 400);
+    const normalizedWallet = `+265${walletDigits.slice(-9)}`;
+
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: booking, error: bookingError } = await admin.from("lakeshore")
       .select("id, full_name, booking_email, booking_amount, selected_seat, departing_center, payment_status")
@@ -43,6 +49,8 @@ Deno.serve(async (req: Request) => {
     const { error: updateError } = await admin.from("lakeshore").update({
       payment_status: "PENDING",
       payment_reference: txRef,
+      momo_number: normalizedWallet,
+      momo_provider: provider,
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
     if (updateError) throw updateError;
