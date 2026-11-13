@@ -30,7 +30,6 @@ export default function AdminDashboard() {
   });
   const [routeClusters, setRouteClusters] = useState([]);
   
-  const [processingAction, setProcessingAction] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -135,14 +134,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSinglePayout = async () => {
-    setStatusMessage({ type: 'error', text: 'Individual payouts are paused until the server-side payout endpoint enforces administrator authorization, verified payment state and idempotency.' });
-  };
-
-  const handleAdminWithdrawal = async () => {
-    setStatusMessage({ type: 'error', text: 'Treasury withdrawals are paused until the payout endpoint and its authorization controls can be audited.' });
-  };
-
   const filteredRegistrations = registrations.filter(u => {
     const s = searchQuery.toLowerCase();
     return u.full_name?.toLowerCase().includes(s) || u.phone_number?.includes(s) || u.booking_email?.toLowerCase().includes(s);
@@ -225,7 +216,6 @@ export default function AdminDashboard() {
                           <td className="p-4 text-right space-x-2 flex items-center justify-end">
                             {isPaid && !isDisbursed ? (
                               <button 
-                                onClick={() => handleSinglePayout(account)}
                                 disabled={true}
                                 className="px-2.5 py-1 bg-emerald-500 text-black font-black text-[10px] uppercase tracking-wider rounded hover:bg-emerald-400 transition-all disabled:opacity-40"
                               >
@@ -272,7 +262,7 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-black text-white uppercase tracking-wider">Execute Global Withdrawal</h3>
               <p className="text-xs text-zinc-500">Disburse completely processed funds out from gateway pipelines to master account balance targets.</p>
             </div>
-            <button disabled={true} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
+            <button disabled={true} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
               <Wallet size={14} /> Payout paused
             </button>
           </div>
