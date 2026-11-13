@@ -19,26 +19,29 @@ export default function Payment() {
   ]);
 
   useEffect(() => {
-    // Read manifest payload states from prior stages
-    const storedPassenger = localStorage.getItem('lakeshore_registration');
-    const storedTrip = localStorage.getItem('lakeshore_selected_trip');
-
-    if (storedPassenger) {
-      const parsedPassenger = JSON.parse(storedPassenger);
-      setPassenger(parsedPassenger);
-      setMomoNumber(parsedPassenger.phone_number || parsedPassenger.phoneNumber || '');
-    }
-    
-    if (storedTrip) {
-      setTrip(JSON.parse(storedTrip));
-    } else {
-      setTrip({
-        id: 'SECURE-MANIFEST',
-        seat: 'L3',
-        from: 'Mwasambo',
-        fare: 'MWK 5,200'
-      });
-    }
+    let active = true;
+    const loadBooking = async () => {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('Your session has expired. Please sign in again.');
+      const { data: booking, error } = await supabase.from('lakeshore')
+        .select('full_name, phone_number, booking_email, selected_seat, departing_center, booking_amount, payment_status')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!active) return;
+      setPassenger(booking || null);
+      setMomoNumber(booking?.phone_number || '');
+      setTrip(booking?.selected_seat ? {
+        id: `SEAT-${booking.selected_seat}`,
+        seat: booking.selected_seat,
+        from: booking.departing_center || 'Not set',
+        fare: `MWK ${Number(booking.booking_amount || 0).toLocaleString()}`
+      } : null);
+    };
+    loadBooking().catch(error => {
+      if (active) setErrorMessage(error.message || 'Unable to load your booking.');
+    });
+    return () => { active = false; };
   }, []);
 
   const handleExecutePayment = async (e) => {
@@ -128,17 +131,17 @@ export default function Payment() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-400 pt-1">
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">PASSENGER NAME</span>
-                  <span className="text-white font-bold">{passenger?.full_name || passenger?.fullName || 'patrick chitambo'}</span>
+                  <span className="text-white font-bold">{passenger?.full_name || 'Not provided'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-cyan-400/20 shadow-[0_0_15px_rgba(0,240,255,0.03)]">
                   <span className="text-[10px] text-cyan-400 font-bold block mb-1">SECURE ALLOCATED SEAT</span>
                   <span className="text-cyan-400 font-black text-sm tracking-widest">
-                    [ {trip?.seat || 'L3'} ]
+                    [ {trip?.seat || 'Not selected'} ]
                   </span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">DEPARTING BOARDING HUB</span>
-                  <span className="text-zinc-300 font-bold">{passenger?.departing_center || passenger?.fromLocation || trip?.from || 'Mwasambo'}</span>
+                  <span className="text-zinc-300 font-bold">{passenger?.departing_center || trip?.from || 'Not set'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">ESTIMATED LAUNCH TIMING</span>
