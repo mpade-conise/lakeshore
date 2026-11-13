@@ -49,47 +49,27 @@ export default function Payment() {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Your session has expired. Please sign in again.');
-
-      const { data: booking, error: bookingError } = await supabase
-        .from('lakeshore')
-        .select('id, full_name, booking_email, booking_amount, selected_seat, departing_center, payment_status')
-        .eq('id', user.id)
-        .single();
-
-      if (bookingError) throw bookingError;
-      const targetAmount = Number(booking.booking_amount);
-      if (!Number.isSafeInteger(targetAmount) || targetAmount <= 0) throw new Error('No valid booking amount was found. Complete your seat booking first.');
-      if (!booking.selected_seat) throw new Error('No seat is reserved on your account yet.');
-      if (booking.payment_status === 'PAID' || booking.payment_status === 'SUCCESSFUL') throw new Error('This booking is already marked as paid.');
-
-      if (!momoNumber.trim()) throw new Error('Enter the mobile money number to use for payment.');
+      const walletDigits = momoNumber.replace(/\D/g, '');
+      if (!/^(265)?[0-9]{9}$/.test(walletDigits)) throw new Error('Enter a valid Malawi mobile money number.');
       if (typeof window.PaychanguCheckout !== 'function') throw new Error('PayChangu checkout could not be loaded. Refresh the page and try again.');
 
-      const txReference = `LAKE-${user.id}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-      const { error: pendingError } = await supabase.from('lakeshore').update({
-        payment_status: 'PENDING',
-        payment_reference: txReference,
-        momo_number: momoNumber,
-        momo_provider: momoProvider === 'airtel' ? 'Airtel Money' : 'TNM Mpamba',
-        updated_at: new Date().toISOString()
-      }).eq('id', user.id);
+      const { data: booking, error: prepareError } = await supabase.functions.invoke('prepare-booking-payment', { body: {} });
+      if (prepareError) throw prepareError;
+      if (!booking?.tx_ref || !Number.isSafeInteger(Number(booking.amount)) || Number(booking.amount) <= 0) throw new Error(booking?.error || 'The server did not return a valid booking payment.');
 
-      if (pendingError) throw pendingError;
-
-      const fullName = booking.full_name || user.user_metadata?.full_name || 'Passenger';
-      const nameParts = fullName.trim().split(/\s+/);
+      const nameParts = String(booking.full_name || 'Passenger').trim().split(/\s+/);
       const firstName = nameParts[0] || 'Passenger';
       const lastName = nameParts.slice(1).join(' ') || 'Student';
 
       window.PaychanguCheckout({
         public_key: import.meta.env.VITE_PAYCHANGU_PUBLIC_KEY,
-        tx_ref: txReference,
-        amount: targetAmount,
+        tx_ref: booking.tx_ref,
+        amount: Number(booking.amount),
         currency: 'MWK',
         callback_url: window.location.origin + '/payment-success',
         return_url: window.location.href,
-        customer: { email: booking.booking_email || user.email, first_name: firstName, last_name: lastName },
-        customization: { title: 'Lakeshore Booking Payment', description: `Seat ${booking.selected_seat} departing from ${booking.departing_center || 'MUBAS'}` },
+        customer: { email: booking.email || user.email, first_name: firstName, last_name: lastName },
+        customization: { title: 'Lakeshore Booking Payment', description: `Seat ${booking.seat} departing from ${booking.departing_center || 'MUBAS'}` },
         meta: { momo_number: momoNumber, momo_provider: momoProvider },
         onclose: () => {
           setProcessing(false);
@@ -97,11 +77,11 @@ export default function Payment() {
         },
         onsuccess: async () => {
           try {
-            const { data, error } = await supabase.functions.invoke('verify-booking-payment', { body: { tx_ref: txReference } });
+            const { data, error } = await supabase.functions.invoke('verify-booking-payment', { body: { tx_ref: booking.tx_ref } });
             if (error) throw error;
-            if (!data?.success) throw new Error(data?.error || 'Payment could not be verified. Do not retry until the transaction status is checked.');
+            if (!data?.success) throw new Error(data?.error || 'Payment could not be verified. Contact support before retrying.');
             localStorage.removeItem('lakeshore_selected_trip');
-            setNotifications(prev => [{ id: txReference, type: 'success', text: `Payment independently verified by the server. Receipt reference: ${txReference}.`, time: new Date().toLocaleTimeString() }, ...prev]);
+            setNotifications(prev => [{ id: booking.tx_ref, type: 'success', text: `Payment independently verified by the server. Receipt reference: ${booking.tx_ref}.`, time: new Date().toLocaleTimeString() }, ...prev]);
             setTrip(null);
           } catch (verificationError) {
             setErrorMessage(`Payment callback received, but server verification is incomplete: ${verificationError.message}`);
