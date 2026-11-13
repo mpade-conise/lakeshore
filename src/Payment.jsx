@@ -19,141 +19,82 @@ export default function Payment() {
   ]);
 
   useEffect(() => {
-    // Read manifest payload states from prior stages
-    const storedPassenger = localStorage.getItem('lakeshore_registration');
-    const storedTrip = localStorage.getItem('lakeshore_selected_trip');
-
-    if (storedPassenger) {
-      const parsedPassenger = JSON.parse(storedPassenger);
-      setPassenger(parsedPassenger);
-      setMomoNumber(parsedPassenger.phone_number || parsedPassenger.phoneNumber || '');
-    }
-    
-    if (storedTrip) {
-      setTrip(JSON.parse(storedTrip));
-    } else {
-      setTrip({
-        id: 'SECURE-MANIFEST',
-        seat: 'L3',
-        from: 'Mwasambo',
-        fare: 'MWK 5,200'
-      });
-    }
+    let active = true;
+    const loadBooking = async () => {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('Your session has expired. Please sign in again.');
+      const { data: booking, error } = await supabase.from('lakeshore')
+        .select('full_name, phone_number, booking_email, selected_seat, departing_center, booking_amount, payment_status')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!active) return;
+      setPassenger(booking || null);
+      setMomoNumber(booking?.phone_number || '');
+      setTrip(booking?.selected_seat ? {
+        id: `SEAT-${booking.selected_seat}`,
+        seat: booking.selected_seat,
+        from: booking.departing_center || 'Not set',
+        fare: `MWK ${Number(booking.booking_amount || 0).toLocaleString()}`
+      } : null);
+    };
+    loadBooking().catch(error => {
+      if (active) setErrorMessage(error.message || 'Unable to load your booking.');
+    });
+    return () => { active = false; };
   }, []);
 
   const handleExecutePayment = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     setProcessing(true);
     setErrorMessage('');
 
-    // Ensure strict uniqueness for tx_ref to avoid PayChangu API validation failures
-    const txReference = `LAKE-TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const targetAmount = 5200; // Fixed structural booking fee (MWK 5,200)
-
     try {
-      if (typeof window.PaychanguCheckout === 'undefined') {
-        throw new Error("PayChangu SDK not initialized. Please ensure popup.js script is included in your index.html head.");
-      }
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('Your session has expired. Please sign in again.');
+      const walletDigits = momoNumber.replace(/\D/g, '');
+      if (!/^(265)?0?[0-9]{9}$/.test(walletDigits)) throw new Error('Enter a valid Malawi mobile money number.');
+      if (typeof window.PaychanguCheckout !== 'function') throw new Error('PayChangu checkout could not be loaded. Refresh the page and try again.');
 
-      // Hard DOM Reset for lingering elements
-      const existingIframes = document.querySelectorAll('iframe[src*="paychangu"]');
-      existingIframes.forEach(iframe => iframe.remove());
+      const { data: booking, error: prepareError } = await supabase.functions.invoke('prepare-booking-payment', { body: { momo_number: momoNumber, momo_provider: momoProvider } });
+      if (prepareError) throw prepareError;
+      if (!booking?.tx_ref || !Number.isSafeInteger(Number(booking.amount)) || Number(booking.amount) <= 0) throw new Error(booking?.error || 'The server did not return a valid booking payment.');
 
-      // Safely fetch user/auth defaults
-      let userId = passenger?.id || "1e58f1a5-5a8f-4013-87bf-9cede57cf326"; 
-      let userEmail = passenger?.booking_email || passenger?.email || "conise@gmail.com";
-      
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          userId = session.user.id;
-          userEmail = session.user.email;
-        }
-      } catch (authErr) {
-        console.warn("Supabase session check bypassed for gateway setup:", authErr.message);
-      }
+      const nameParts = String(booking.full_name || 'Passenger').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Passenger';
+      const lastName = nameParts.slice(1).join(' ') || 'Student';
 
-      // Parse first and last name as required by standard customer schema split
-      const fullName = passenger?.full_name || passenger?.fullName || "Patrick Chitambo";
-      const nameParts = fullName.trim().split(/\s+/);
-      const firstName = nameParts[0] || "Patrick";
-      const lastName = nameParts.slice(1).join(" ") || "Chitambo";
-
-      // Small delay to ensure DOM updates and wrapper exists
-      setTimeout(() => {
-        try {
-          window.PaychanguCheckout({
-            "public_key": import.meta.env.VITE_PAYCHANGU_PUBLIC_KEY, 
-            "tx_ref": txReference,
-            "amount": targetAmount,
-            "currency": "MWK",
-            "callback_url": window.location.origin + "/payment-success", // Appended verification redirect destination
-            "return_url": window.location.href,                          // Fallback destination on failure/cancel
-            "customer": {
-              "email": userEmail,
-              "first_name": firstName,
-              "last_name": lastName
-            },
-            "customization": {
-              "title": "Lakeshore Booking Settlement",
-              "description": `Seat ${trip?.seat || "L3"} departing from ${trip?.from || "Mwasambo"}`
-            },
-            "meta": {
-              "momo_number": momoNumber,
-              "momo_provider": momoProvider
-            },
-            onclose: () => {
-              setProcessing(false);
-              setNotifications(prev => [{
-                id: `CANCEL-${Date.now()}`,
-                type: 'system',
-                text: 'Gateway checkout window closed by user.',
-                time: new Date().toLocaleTimeString()
-              }, ...prev]);
-            },
-            onsuccess: async (response) => {
-              try {
-                // Settle and finalize state tracking structures inside 'lakeshore' table
-                const { error: dbError } = await supabase
-                  .from('lakeshore')
-                  .update({
-                    payment_status: 'PAID',
-                    payment_reference: txReference,
-                    momo_number: momoNumber,
-                    momo_provider: momoProvider === 'airtel' ? 'Airtel Money' : 'TNM Mpamba',
-                    payment_completed_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', userId);
-
-                if (dbError) throw dbError;
-
-                localStorage.removeItem('lakeshore_selected_trip');
-
-                setNotifications(prev => [{
-                  id: txReference,
-                  type: 'success',
-                  text: `SUCCESS // Booking Finalized! Record mutated to PAID. Ref: ${txReference}. Confirmed receipt via ${momoProvider.toUpperCase()}.`,
-                  time: new Date().toLocaleTimeString()
-                }, ...prev]);
-                setTrip(null); 
-              } catch (dbErr) {
-                console.error("Post-success handling error inside Database write:", dbErr);
-                setErrorMessage(`Payment confirmed but local ledger update failed: ${dbErr.message}`);
-              } finally {
-                setProcessing(false);
-              }
-            }
-          });
-        } catch (innerScriptErr) {
-          console.error("PayChangu inner instantiation crash handled:", innerScriptErr);
-          setErrorMessage(`SDK Engine initialization exception: ${innerScriptErr.message}`);
+      window.PaychanguCheckout({
+        public_key: import.meta.env.VITE_PAYCHANGU_PUBLIC_KEY,
+        tx_ref: booking.tx_ref,
+        amount: Number(booking.amount),
+        currency: 'MWK',
+        callback_url: window.location.origin + '/payment-success',
+        return_url: window.location.href,
+        customer: { email: booking.email || user.email, first_name: firstName, last_name: lastName },
+        customization: { title: 'Lakeshore Booking Payment', description: `Seat ${booking.seat} departing from ${booking.departing_center || 'MUBAS'}` },
+        meta: { momo_number: momoNumber, momo_provider: momoProvider },
+        onclose: () => {
           setProcessing(false);
+          setNotifications(prev => [{ id: `CANCEL-${Date.now()}`, type: 'system', text: 'Checkout closed. Payment remains pending until server verification confirms a completed transaction.', time: new Date().toLocaleTimeString() }, ...prev]);
+        },
+        onsuccess: async () => {
+          try {
+            const { data, error } = await supabase.functions.invoke('verify-booking-payment', { body: { tx_ref: booking.tx_ref } });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || 'Payment could not be verified. Contact support before retrying.');
+            localStorage.removeItem('lakeshore_selected_trip');
+            setNotifications(prev => [{ id: booking.tx_ref, type: 'success', text: `Payment independently verified by the server. Receipt reference: ${booking.tx_ref}.`, time: new Date().toLocaleTimeString() }, ...prev]);
+            setTrip(null);
+          } catch (verificationError) {
+            setErrorMessage(`Payment callback received, but server verification is incomplete: ${verificationError.message}`);
+          } finally {
+            setProcessing(false);
+          }
         }
-      }, 150);
-
+      });
     } catch (err) {
-      setErrorMessage(err.message);
+      setErrorMessage(err.message || 'Unable to start payment.');
       setProcessing(false);
     }
   };
@@ -190,17 +131,17 @@ export default function Payment() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-400 pt-1">
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">PASSENGER NAME</span>
-                  <span className="text-white font-bold">{passenger?.full_name || passenger?.fullName || 'patrick chitambo'}</span>
+                  <span className="text-white font-bold">{passenger?.full_name || 'Not provided'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-cyan-400/20 shadow-[0_0_15px_rgba(0,240,255,0.03)]">
                   <span className="text-[10px] text-cyan-400 font-bold block mb-1">SECURE ALLOCATED SEAT</span>
                   <span className="text-cyan-400 font-black text-sm tracking-widest">
-                    [ {trip?.seat || 'L3'} ]
+                    [ {trip?.seat || 'Not selected'} ]
                   </span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">DEPARTING BOARDING HUB</span>
-                  <span className="text-zinc-300 font-bold">{passenger?.departing_center || passenger?.fromLocation || trip?.from || 'Mwasambo'}</span>
+                  <span className="text-zinc-300 font-bold">{passenger?.departing_center || trip?.from || 'Not set'}</span>
                 </div>
                 <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
                   <span className="text-[10px] text-zinc-600 font-bold block mb-1">ESTIMATED LAUNCH TIMING</span>

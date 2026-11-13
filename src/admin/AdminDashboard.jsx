@@ -30,17 +30,7 @@ export default function AdminDashboard() {
   });
   const [routeClusters, setRouteClusters] = useState([]);
   
-  const [processingAction, setProcessingAction] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
-
-  // Paychangu Provider-to-RefID Registry Mapping Lookup Table
-  const operatorRefs = {
-    'airtel': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
-    'airtel money': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
-    'tnm': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
-    'tnm mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
-    'mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca'
-  };
 
   useEffect(() => {
     fetchAdminData();
@@ -144,95 +134,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSinglePayout = async (account) => {
-    const providerKey = (account.momo_provider || '').toLowerCase().trim();
-    const targetOperatorRef = operatorRefs[providerKey];
-
-    if (!account.momo_number) {
-      setStatusMessage({ type: 'error', text: 'Aborted: Target user profile lacks a Mobile Money destination number.' });
-      return;
-    }
-
-    if (!targetOperatorRef) {
-      setStatusMessage({ type: 'error', text: `Aborted: Unrecognized Mobile Money operator context value: "${account.momo_provider}"` });
-      return;
-    }
-
-    setProcessingAction(account.id);
-    setStatusMessage({ type: '', text: '' });
-
-    try {
-      const uniqueChargeId = `CHG-${account.id.substring(0, 8).toUpperCase()}`;
-
-      const response = await fetch('https://api.paychangu.com/mobile-money/payouts/initialize', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          mobile: account.momo_number,
-          mobile_money_operator_ref_id: targetOperatorRef,
-          amount: String(account.booking_amount),
-          charge_id: uniqueChargeId,
-          email: account.booking_email || 'billing@lakeshore.edu',
-          first_name: account.full_name?.split(' ')[0] || 'Student',
-          last_name: account.full_name?.split(' ')[1] || 'Passenger',
-          transaction_status: "SUCCESSFUL"
-        })
-      });
-
-      const outcome = await response.json();
-
-      if (outcome.status === 'success') {
-        const { error: patchError } = await supabase
-          .from('lakeshore')
-          .update({ payment_reference: `DISBURSED-${uniqueChargeId}` })
-          .eq('id', account.id);
-
-        if (patchError) throw patchError;
-
-        setStatusMessage({ type: 'success', text: `Payout of MWK ${account.booking_amount} to ${account.full_name} processed cleanly.` });
-        fetchAdminData();
-      } else {
-        throw new Error(outcome.message || 'Paychangu engine rejected transaction request flags.');
-      }
-    } catch (err) {
-      setStatusMessage({ type: 'error', text: `Payout Disburse Exception: ${err.message}` });
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-  const handleAdminWithdrawal = async () => {
-    if (financialStats.withdrawableBalance <= 0) {
-      setStatusMessage({ type: 'error', text: 'No authorized withdrawable balance packets found.' });
-      return;
-    }
-
-    setProcessingAction('withdraw');
-    try {
-      const response = await fetch('https://urvjylqterbrfulxodwc.supabase.co/functions/v1/paychangu-payout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({ adminWithdrawal: true, amount: financialStats.withdrawableBalance })
-      });
-
-      const result = await response.json();
-      if (!response.ok || result.error) throw new Error(result.error || 'Gateway validation rejected.');
-
-      setStatusMessage({ type: 'success', text: `MWK ${financialStats.withdrawableBalance.toLocaleString()} cleared to treasury.` });
-      fetchAdminData();
-    } catch (err) {
-      setStatusMessage({ type: 'error', text: `Gateway fault: ${err.message}` });
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
   const filteredRegistrations = registrations.filter(u => {
     const s = searchQuery.toLowerCase();
     return u.full_name?.toLowerCase().includes(s) || u.phone_number?.includes(s) || u.booking_email?.toLowerCase().includes(s);
@@ -315,11 +216,11 @@ export default function AdminDashboard() {
                           <td className="p-4 text-right space-x-2 flex items-center justify-end">
                             {isPaid && !isDisbursed ? (
                               <button 
-                                onClick={() => handleSinglePayout(account)}
-                                disabled={processingAction === account.id}
+                                
+                                disabled={true}
                                 className="px-2.5 py-1 bg-emerald-500 text-black font-black text-[10px] uppercase tracking-wider rounded hover:bg-emerald-400 transition-all disabled:opacity-40"
                               >
-                                {processingAction === account.id ? 'SENDING...' : 'Disburse MoMo'}
+                                Payout paused
                               </button>
                             ) : isDisbursed ? (
                               <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider bg-zinc-900 px-2 py-1 rounded border border-zinc-800">Disbursed</span>
@@ -362,8 +263,8 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-black text-white uppercase tracking-wider">Execute Global Withdrawal</h3>
               <p className="text-xs text-zinc-500">Disburse completely processed funds out from gateway pipelines to master account balance targets.</p>
             </div>
-            <button disabled={financialStats.withdrawableBalance === 0 || processingAction === 'withdraw'} onClick={handleAdminWithdrawal} className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
-              <Wallet size={14} /> {processingAction === 'withdraw' ? 'PROCESSING...' : 'Cash Out Reserves'}
+            <button disabled={true}  className="w-full md:w-auto px-5 py-3 bg-emerald-500 disabled:bg-zinc-900 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2">
+              <Wallet size={14} /> Payout paused
             </button>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { ShieldCheck, User, Users, ShieldAlert, KeyRound, Globe, ToggleLeft, Tog
 
 // Modular Login/Register Views
 import Login from './Login';
-import Register from './Register';
+import SignUp from './SignUp';
 
 export default function Auth({ onAuthSuccess }) {
   // Navigation matrix router within the authorization frame
@@ -54,7 +54,7 @@ export default function Auth({ onAuthSuccess }) {
 
       {activeSubView === 'register' && (
         <div>
-          <Register onAuthSuccess={onAuthSuccess} />
+          <SignUp onAuthSuccess={onAuthSuccess} />
           <div className="mt-4 text-center">
             <button 
               onClick={() => setActiveSubView('login')}

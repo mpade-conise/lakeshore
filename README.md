@@ -1,16 +1,32 @@
-# React + Vite
+# Lakeshore MUBAS Transport
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Lakeshore is a passenger booking and transport management application built with React, Vite and Supabase.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Install dependencies with `npm install`.
+2. Copy `.env.example` to `.env`.
+3. Set the Supabase project URL, publishable/anon key and PayChangu public key.
+4. Run `npm run dev`; run `npm run build` before submitting changes.
 
-## React Compiler
+## Server-side secrets
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Never put PayChangu secret keys or Supabase service-role keys in browser code or any `VITE_*` variable. Configure `PAYCHANGU_SECRET_KEY` as a Supabase Edge Function secret. The Supabase runtime supplies its service-role key; do not copy it into the client environment.
 
-## Expanding the ESLint configuration
+The `.env` file is ignored by Git. If a secret was ever committed, deleting the file does not remove it from Git history: revoke/rotate the credential at its provider and review deployment logs and access.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Booking payment verification
+
+The booking checkout uses two Supabase Edge Functions:
+
+- `prepare-booking-payment`: authenticates the passenger, reads the passenger's booking amount and seat, and creates a pending transaction reference.
+- `verify-booking-payment`: independently verifies the transaction with PayChangu and only then marks the passenger's booking as paid.
+
+Deploy both functions and configure their server secrets before enabling payments in production. Never treat the PayChangu browser callback as proof of payment.
+
+## Security and operational notes
+
+- Passenger dashboards should only read the signed-in passenger's own record.
+- Database row-level security and column-level write permissions must prevent passengers from changing payment status, payment references or payout state directly.
+- Seat availability shown in the browser is advisory; the database must enforce seat uniqueness atomically before a booking can be confirmed.
+- Payouts are intentionally paused in the admin UI until the server-side payout endpoint can be audited for administrator authorization, payment-state checks and idempotency.

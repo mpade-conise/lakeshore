@@ -35,11 +35,15 @@ export default function Home() {
       try {
         setLoading(true);
 
-        // 1. Fetch data explicitly naming key columns to bypass decryption policies
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) throw new Error('Your session has expired. Please sign in again.');
+
+        // Passenger dashboards are scoped to the signed-in account only.
         const { data: passengers, error: fetchError } = await supabase
-          .from('lakeshore') 
-          .select('id, full_name, selected_seat, departing_center, created_at')
-          .order('created_at', { ascending: false });
+          .from('lakeshore')
+          .select('id, full_name, selected_seat, departing_center, created_at, payment_status, booking_amount')
+          .eq('id', user.id)
+          .limit(1);
 
         if (fetchError) throw fetchError;
 
@@ -49,15 +53,11 @@ export default function Home() {
         const total = recordArray.length;
         
         const uniqueCenters = [...new Set(recordArray.map(p => p.departing_center).filter(Boolean))];
-        const activeCentersCount = uniqueCenters.length || 4; 
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const filledToday = recordArray.filter(p => p.created_at && p.created_at.startsWith(todayStr)).length;
-
+        
         setAnalytics({
           totalBookings: total,
-          activeRoutes: activeCentersCount,
-          seatsFilledToday: filledToday || total, 
+          activeRoutes: uniqueCenters[0] || 'Not set',
+          seatsFilledToday: recordArray[0]?.selected_seat || 'Not selected', 
         });
 
         // 3. Populate passenger roster array
@@ -141,21 +141,21 @@ export default function Home() {
         {/* TOTAL BOOKINGS */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 sm:p-4 text-cyan-500/10"><TrendingUp size={36} /></div>
-          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Total Live Bookings</p>
+          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Your Booking Record</p>
           <p className="text-xl sm:text-2xl font-black text-white mt-1">{analytics.totalBookings}</p>
         </div>
         
         {/* ACTIVE ROUTES */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 sm:p-4 text-fuchsia-500/10"><MapPin size={36} /></div>
-          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Active Location Centers</p>
+          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Your Departure Hub</p>
           <p className="text-xl sm:text-2xl font-black text-white mt-1">{analytics.activeRoutes}</p>
         </div>
 
         {/* SEATS FILLED */}
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 col-span-1 sm:col-span-2 lg:col-span-1 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 sm:p-4 text-emerald-500/10"><Users size={36} /></div>
-          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Seats Filled Cycle</p>
+          <p className="text-[9px] sm:text-[10px] tracking-widest text-zinc-500 uppercase font-bold">Your Selected Seat</p>
           <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">{analytics.seatsFilledToday}</p>
         </div>
       </div>
@@ -195,12 +195,12 @@ export default function Home() {
         {/* BOOKED PASSENGERS MATRIX SHOWCASE */}
         <div className="lg:col-span-2 bg-zinc-950 border border-zinc-900 rounded-2xl p-4 sm:p-5 space-y-4">
           <h3 className="text-[11px] sm:text-xs font-black tracking-wider text-zinc-400 uppercase flex items-center gap-2">
-            <Users size={14} className="text-cyan-400 flex-shrink-0" /> Booked Passengers & Assigned Seats
+            <Users size={14} className="text-cyan-400 flex-shrink-0" /> Your Booking Details
           </h3>
           
           {bookedPassengers.length === 0 ? (
             <div className="text-center py-8 text-xs text-zinc-600 uppercase font-bold">
-              No passenger vectors initialized in manifest database.
+              No booking record found. Complete your passenger details to get started.
             </div>
           ) : (
             <>
