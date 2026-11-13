@@ -33,15 +33,6 @@ export default function AdminDashboard() {
   const [processingAction, setProcessingAction] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-  // Paychangu Provider-to-RefID Registry Mapping Lookup Table
-  const operatorRefs = {
-    'airtel': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
-    'airtel money': '20be6c20-adeb-4b5b-a7ba-0769820df4fb',
-    'tnm': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
-    'tnm mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca',
-    'mpamba': '27494cb5-ba9e-437f-a114-4e7a7686bcca'
-  };
-
   useEffect(() => {
     fetchAdminData();
     loadConfiguredPrices();
